@@ -40,6 +40,7 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
   const previousDate = format(addDays(date, view === "week" ? -7 : view === "month" ? -30 : -1), "yyyy-MM-dd");
   const nextDate = format(addDays(date, view === "week" ? 7 : view === "month" ? 30 : 1), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
+  const canOperate = ["owner", "admin", "receptionist"].includes(tenant.role);
 
   return (
     <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -60,15 +61,19 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" size={17} />
               <input className="min-h-11 w-52 rounded-xl border border-zinc-200 bg-white pl-10 pr-3 text-sm" placeholder="Buscar cliente" type="search" />
             </label>
-            <QuickBooking
-              initialDate={today}
-              locationId={locationId}
-              services={services}
-              slug={slug}
-              staff={staff}
-              timezone={tenant.timezone}
-            />
-            <QuickBlock date={selectedDate} locationId={locationId} slug={slug} staff={staff} />
+            {canOperate ? (
+              <>
+                <QuickBooking
+                  initialDate={today}
+                  locationId={locationId}
+                  services={services}
+                  slug={slug}
+                  staff={staff}
+                  timezone={tenant.timezone}
+                />
+                <QuickBlock date={selectedDate} locationId={locationId} slug={slug} staff={staff} />
+              </>
+            ) : null}
           </div>
         </div>
 

@@ -32,8 +32,17 @@ na aplicação não fazem parte do banco ativo.
 
 - `outbox_events`, `public_rate_limits`
 
+Eventos são reclamados por `claim_outbox_events` com `FOR UPDATE SKIP LOCKED` e
+lease de cinco minutos. `complete_outbox_event` conclui; `defer_outbox_event`
+reagenda com backoff. As três RPCs aceitam somente `service_role`.
+
 ## Regra de manutenção
 
 Uma nova tabela só deve ser criada quando houver um fluxo ativo que precise de
 integridade relacional própria. Preferências pequenas e metadados opcionais devem
 usar as colunas `jsonb` já existentes nas entidades principais.
+
+## Histórico atual
+
+- `0016_simplify_schema.sql`: remove módulos sem fluxo ativo.
+- `0017_outbox_worker.sql`: adiciona consumo transacional sem criar tabela.

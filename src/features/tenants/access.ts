@@ -33,20 +33,22 @@ export interface TenantContext {
   staffId: string | null;
 }
 
-export const requireTenantAccess = cache(async (slug: string): Promise<TenantContext> => {
-  const user = await requireUser();
+export async function getTenantAccess(
+  slug: string,
+  userId: string,
+): Promise<TenantContext | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tenant_members")
     .select(
       "role, permissions, staff_id, tenants!inner(id, slug, name, timezone, currency, state)",
     )
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("is_active", true)
     .eq("tenants.slug", slug)
     .maybeSingle();
 
-  if (error || !data) notFound();
+  if (error || !data) return null;
   const row = contextSchema.parse(data);
   return {
     ...row.tenants,
@@ -54,4 +56,11 @@ export const requireTenantAccess = cache(async (slug: string): Promise<TenantCon
     permissions: row.permissions,
     staffId: row.staff_id,
   };
+}
+
+export const requireTenantAccess = cache(async (slug: string): Promise<TenantContext> => {
+  const user = await requireUser();
+  const tenant = await getTenantAccess(slug, user.id);
+  if (!tenant) notFound();
+  return tenant;
 });

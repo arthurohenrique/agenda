@@ -11,8 +11,8 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], channel: "chrome" } },
-    { name: "mobile", use: { ...devices["Pixel 7"], channel: "chrome" } },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     command: "npm run dev",

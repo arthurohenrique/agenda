@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(12);
 
 select ok(
   not exists (
@@ -58,6 +58,43 @@ select ok(
   public.is_reserved_slug('admin') and not public.is_reserved_slug('barbearia-central'),
   'Slugs internos são reservados'
 );
+
+select ok(
+  not has_function_privilege('anon', 'public.claim_outbox_events(integer)', 'EXECUTE'),
+  'Anon não executa claim da outbox'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.claim_outbox_events(integer)', 'EXECUTE'),
+  'Usuário autenticado não executa claim da outbox'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.claim_outbox_events(integer)', 'EXECUTE'),
+  'Service role executa claim da outbox'
+);
+
+insert into public.outbox_events (
+  id, tenant_id, aggregate_type, aggregate_id, event_type
+) values (
+  '99000000-0000-4000-8000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'appointment',
+  '80000000-0000-0000-0000-000000000001',
+  'appointment.test'
+);
+
+set local role service_role;
+select is(
+  (select count(*)::integer from public.claim_outbox_events(1)),
+  1,
+  'Worker reclama um evento elegível'
+);
+select ok(
+  public.complete_outbox_event('99000000-0000-4000-8000-000000000001'),
+  'Worker conclui evento reclamado'
+);
+reset role;
 
 select * from finish();
 rollback;

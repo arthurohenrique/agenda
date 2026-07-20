@@ -2,10 +2,13 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
+import { getBookingTokenPepper, getServerEnv } from "@/lib/env";
 
 export function requestFingerprint(request: NextRequest, tenantSlug: string) {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwarded ?? request.headers.get("x-real-ip") ?? "unknown";
-  const pepper = process.env.BOOKING_TOKEN_PEPPER ?? "local-development-only";
+  const trustedHeader = getServerEnv().TRUSTED_CLIENT_IP_HEADER;
+  const ip = trustedHeader
+    ? request.headers.get(trustedHeader)?.split(",")[0]?.trim() || "unavailable"
+    : "unavailable";
+  const pepper = getBookingTokenPepper();
   return createHash("sha256").update(`${pepper}:${tenantSlug}:${ip}`).digest("hex");
 }

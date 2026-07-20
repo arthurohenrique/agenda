@@ -47,10 +47,17 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 SUPABASE_SERVICE_ROLE_KEY=server-only-when-required
 BOOKING_TOKEN_PEPPER=at-least-32-random-characters
+TRUSTED_CLIENT_IP_HEADER=x-real-ip
+NOTIFICATION_WORKER_SECRET=at-least-32-random-characters
+NOTIFICATION_MODE=dry-run
+NOTIFICATION_WEBHOOK_URL=https://provider.example/events
+NOTIFICATION_WEBHOOK_SECRET=provider-secret
 ```
 
-`NEXT_PUBLIC_*` entra no bundle. `SUPABASE_SERVICE_ROLE_KEY` e peppers nunca podem
-ser expostos ao navegador.
+`NEXT_PUBLIC_*` entra no bundle. `SUPABASE_SERVICE_ROLE_KEY`, peppers e segredos de
+worker/provedor nunca podem ser expostos ao navegador. Em produção, o pepper é
+obrigatório. Header de IP só deve ser configurado quando o proxy remover valores
+enviados pelo cliente.
 
 Instalação local:
 
@@ -148,6 +155,19 @@ sequenceDiagram
 - Janela e regras vêm das configurações do estabelecimento.
 - Reagendamento cria a nova reserva e relaciona origem/destino na mesma operação.
 
+### Notificações
+
+- A transação grava `outbox_events`.
+- `POST /api/internal/notifications` exige bearer secret.
+- O worker reclama eventos com lease, envia em modo `dry-run` ou webhook e conclui.
+- Falha aplica backoff; depois de oito tentativas o evento exige intervenção.
+
+### LGPD
+
+- Exportação JSON exige sessão, papel `owner/admin` e acesso ao tenant.
+- Dados são lidos sob RLS e resposta usa `private, no-store`.
+- Anonimização permanece bloqueada até separar PII global por tenant com segurança.
+
 ## 9. Rotas
 
 | Rota | Finalidade |
@@ -162,6 +182,9 @@ sequenceDiagram
 | `/app/{slug}/configuracoes` | Checklist e publicação |
 | `/onboarding` | Criação inicial do estabelecimento |
 | `/auth/callback` | Troca de código por sessão |
+| `/api/app/{slug}/customers/{id}/export` | Exportação LGPD |
+| `/api/internal/notifications` | Consumo protegido da outbox |
+| `/api/health` | Estado mínimo sem segredos |
 
 ## 10. Testes e qualidade
 
@@ -184,6 +207,10 @@ npm run test:db
 O teste de concorrência exige um sucesso e um conflito quando duas reservas tentam
 ocupar o mesmo profissional e intervalo.
 
+GitHub Actions executa validação da aplicação, auditoria de dependências, Supabase
+local, pgTAP, concorrência e Playwright. O ambiente local sem Docker não executa a
+segunda parte.
+
 ## 11. Deploy
 
 1. Crie o projeto Supabase e aplique migrations na ordem.
@@ -196,6 +223,8 @@ ocupar o mesmo profissional e intervalo.
 
 ## 12. Observabilidade e incidentes
 
+- Logs do servidor são JSON estruturado e não devem receber PII.
+- `/api/health` informa apenas estado e versão.
 - Verifique logs do Next.js e do Supabase.
 - Para falha de login, confirme URL, chave, usuário e redirect URLs.
 - Para `PGRST201`, explicite a foreign key no relacionamento embutido.
@@ -210,3 +239,5 @@ ocupar o mesmo profissional e intervalo.
 - [Status de implementação](IMPLEMENTATION_STATUS.md)
 - [Guia do proprietário](OWNER_GUIDE.md)
 - [Instruções para agentes](../AGENTS.md)
+- [Plano de execução](EXECUTION_PLAN.md)
+- [Auditoria Vibe Check](../security/AUDIT_SUMMARY.md)

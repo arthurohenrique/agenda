@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/env";
+import { isTrustedMutationRequest } from "@/lib/security/origin";
 import { createClient } from "@/lib/supabase/server";
 
 const rescheduleSchema = z.object({
@@ -12,6 +13,9 @@ const rescheduleSchema = z.object({
 interface RescheduleRouteProps { params: Promise<{ token: string }> }
 
 export async function POST(request: NextRequest, { params }: RescheduleRouteProps) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
+  }
   if (!isSupabaseConfigured()) return NextResponse.json({ error: "Serviço indisponível." }, { status: 503 });
   const { token } = await params;
   if (!/^[a-f0-9]{64}$/.test(token)) return NextResponse.json({ error: "Link inválido." }, { status: 404 });

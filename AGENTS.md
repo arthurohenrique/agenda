@@ -69,6 +69,23 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
 - Nunca confie em `tenant_id`, papel ou preço enviados pelo navegador.
 - A chave publicável pode ir ao bundle; chaves secretas ficam somente no servidor.
 
+## Segurança obrigatória — Vibe Check
+
+Regras incorporadas de `benavlabs/vibe-check`, commit
+`8894f172c24224a7aaf87e723fc0b88c319f8963`:
+
+- Nunca versione credenciais ou coloque segredo em variável `NEXT_PUBLIC_*`.
+- Toda rota privada autentica antes de ler entrada e valida acesso ao tenant/recurso.
+- Toda tabela exposta mantém RLS habilitada e forçada; nenhuma policy irrestrita.
+- Toda entrada externa recebe validação no servidor; SQL permanece parametrizado.
+- Mutações HTTP validam origem ou usam autenticação não baseada em cookie.
+- APIs retornam erros genéricos; detalhes ficam somente em logs do servidor.
+- Não busque URL fornecida por usuário sem proteção completa contra SSRF.
+- Upload futuro valida magic bytes, tamanho e nome UUID no servidor.
+- Webhook futuro valida assinatura e idempotência antes de processar.
+- Dependências novas exigem verificação no registro oficial e versão exata.
+- Execute a auditoria em `security/` depois de alterar fronteiras de confiança.
+
 ## Convenções de implementação
 
 - Server Components por padrão; adicione `"use client"` apenas quando necessário.

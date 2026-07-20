@@ -3,9 +3,13 @@ import { publicBookingSchema } from "@/features/booking/schemas";
 import { isSupabaseConfigured } from "@/lib/env";
 import { normalizePhone } from "@/lib/phone";
 import { requestFingerprint } from "@/lib/rate-limit";
+import { isTrustedMutationRequest } from "@/lib/security/origin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
+  }
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Serviço indisponível." }, { status: 503 });
   }

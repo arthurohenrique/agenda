@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requireTenantAccess } from "@/features/tenants/access";
+import { getTenantAccess } from "@/features/tenants/access";
+import { getCurrentUser } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/phone";
+import { isTrustedMutationRequest } from "@/lib/security/origin";
 import { createClient } from "@/lib/supabase/server";
 
 const adminBookingSchema = z.object({
@@ -20,8 +22,18 @@ const adminBookingSchema = z.object({
 interface AdminBookingRouteProps { params: Promise<{ slug: string }> }
 
 export async function POST(request: NextRequest, { params }: AdminBookingRouteProps) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
+  }
   const { slug } = await params;
-  const tenant = await requireTenantAccess(slug);
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+  }
+  const tenant = await getTenantAccess(slug, user.id);
+  if (!tenant || !["owner", "admin", "receptionist"].includes(tenant.role)) {
+    return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
+  }
   const body: unknown = await request.json().catch(() => null);
   const parsed = adminBookingSchema.safeParse(body);
   if (!parsed.success) {

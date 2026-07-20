@@ -62,6 +62,8 @@ flowchart LR
 | [Guia do proprietário](docs/OWNER_GUIDE.md) | Donos e administradores |
 | [Manual em PDF](output/pdf/manual-do-proprietario-agenda.pdf) | Donos e administradores |
 | [Status de implementação](docs/IMPLEMENTATION_STATUS.md) | Produto e QA |
+| [Plano de hardening](docs/EXECUTION_PLAN.md) | Engenharia e segurança |
+| [Auditoria Vibe Check](security/AUDIT_SUMMARY.md) | Segurança |
 
 ## Stack
 
@@ -91,6 +93,9 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 SUPABASE_SERVICE_ROLE_KEY=<somente-servidor>
 BOOKING_TOKEN_PEPPER=<32-ou-mais-caracteres>
+TRUSTED_CLIENT_IP_HEADER=x-real-ip
+NOTIFICATION_WORKER_SECRET=<32-ou-mais-caracteres>
+NOTIFICATION_MODE=dry-run
 ```
 
 Nunca exponha `sb_secret`, `service_role` ou peppers em variáveis `NEXT_PUBLIC_*`.
@@ -130,6 +135,10 @@ npm run test:db
 - A confirmação de reserva recalcula disponibilidade.
 - Constraints são a autoridade final contra concorrência.
 - Dados administrativos usam cache privado ou `no-store`.
+- CSP, HSTS e headers defensivos são globais.
+- Mutações HTTP rejeitam origem externa.
+- Worker da outbox usa lease, retry e bearer secret.
+- Auditoria Vibe Check cobre 17 categorias.
 
 Antes da produção, configure SMTP, redirect URLs, MFA para papéis críticos,
 CAPTCHA, backups/PITR, alertas, domínio e secrets no provedor de hospedagem.
