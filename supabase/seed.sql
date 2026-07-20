@@ -11,13 +11,19 @@ insert into auth.users (
   email_confirmed_at,
   raw_app_meta_data,
   raw_user_meta_data,
+  confirmation_token,
+  recovery_token,
+  email_change_token_new,
+  email_change,
+  email_change_token_current,
+  reauthentication_token,
   created_at,
   updated_at
 ) values
-  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'dono.barbearia@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Rafael Demo"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'dona.salao@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Ana Demo"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'dona.clinica@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Camila Demo"}', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'multi@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Operação Multi"}', now(), now())
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'dono.barbearia@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Rafael Demo"}', '', '', '', '', '', '', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'dona.salao@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Ana Demo"}', '', '', '', '', '', '', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'dona.clinica@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Camila Demo"}', '', '', '', '', '', '', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'multi@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Operação Multi"}', '', '', '', '', '', '', now(), now())
 on conflict (id) do nothing;
 
 insert into auth.identities (

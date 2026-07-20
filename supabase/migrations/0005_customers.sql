@@ -3,7 +3,7 @@ begin;
 create table public.customers (
   id uuid primary key default gen_random_uuid(),
   full_name text not null check (char_length(full_name) between 2 and 120),
-  phone_e164 text not null check (phone_e164 ~ '^\\+[1-9][0-9]{7,14}$'),
+  phone_e164 text not null check (phone_e164 ~ '^\+[1-9][0-9]{7,14}$'),
   email extensions.citext,
   birth_date date,
   locale text not null default 'pt-BR',

@@ -24,17 +24,23 @@ declare
   v_service_ids uuid[];
   v_allowed boolean;
 begin
-  select a, t.slug::text, bs.allow_customer_reschedule
-    into v_appointment, v_slug, v_allowed
+  select a.*
+    into v_appointment
   from public.booking_tokens bt
   join public.appointments a
     on a.tenant_id = bt.tenant_id and a.id = bt.appointment_id
-  join public.tenants t on t.id = a.tenant_id
-  join public.business_settings bs on bs.tenant_id = a.tenant_id
   where bt.token_hash = extensions.digest(convert_to(p_token, 'UTF8'), 'sha256')
     and bt.purpose = 'manage'
     and bt.revoked_at is null
     and bt.expires_at > statement_timestamp();
+
+  if v_appointment.id is not null then
+    select t.slug::text, bs.allow_customer_reschedule
+      into v_slug, v_allowed
+    from public.tenants t
+    join public.business_settings bs on bs.tenant_id = t.id
+    where t.id = v_appointment.tenant_id;
+  end if;
 
   if v_appointment.id is null or not v_allowed or not v_appointment.occupies_slot then
     raise exception using errcode = 'P0002', message = 'reschedule_not_allowed';
@@ -83,30 +89,11 @@ declare
   v_new_id uuid;
   v_existing record;
 begin
-  select
-    a,
-    t.slug::text,
-    coalesce(ct.display_name, c.full_name),
-    c.phone_e164,
-    c.email::text,
-    bs.allow_customer_reschedule,
-    bs.cancellation_window_minutes
-  into
-    v_old,
-    v_slug,
-    v_customer_name,
-    v_customer_phone,
-    v_customer_email,
-    v_allowed,
-    v_window
+  select a.*
+  into v_old
   from public.booking_tokens bt
   join public.appointments a
     on a.tenant_id = bt.tenant_id and a.id = bt.appointment_id
-  join public.tenants t on t.id = a.tenant_id
-  join public.business_settings bs on bs.tenant_id = a.tenant_id
-  join public.customer_tenants ct
-    on ct.tenant_id = a.tenant_id and ct.id = a.customer_tenant_id
-  join public.customers c on c.id = ct.customer_id
   where bt.token_hash = extensions.digest(convert_to(p_token, 'UTF8'), 'sha256')
     and bt.purpose = 'manage'
     and bt.revoked_at is null
@@ -116,6 +103,27 @@ begin
   if v_old.id is null then
     raise exception using errcode = 'P0002', message = 'booking_token_not_found';
   end if;
+
+  select
+    t.slug::text,
+    coalesce(ct.display_name, c.full_name),
+    c.phone_e164,
+    c.email::text,
+    bs.allow_customer_reschedule,
+    bs.cancellation_window_minutes
+  into
+    v_slug,
+    v_customer_name,
+    v_customer_phone,
+    v_customer_email,
+    v_allowed,
+    v_window
+  from public.tenants t
+  join public.business_settings bs on bs.tenant_id = t.id
+  join public.customer_tenants ct
+    on ct.tenant_id = t.id and ct.id = v_old.customer_tenant_id
+  join public.customers c on c.id = ct.customer_id
+  where t.id = v_old.tenant_id;
 
   if not v_old.occupies_slot and v_old.rescheduled_to_id is not null then
     select a.id, a.status, a.starts_at, a.ends_at, st.name as staff_name

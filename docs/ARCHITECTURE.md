@@ -37,7 +37,7 @@ flowchart LR
 7. Disponibilidade: leitura pelo motor central; confirmação sempre recalcula na RPC transacional.
 8. Concorrência: intervalos ocupados materializados em alocações com `EXCLUDE USING gist`. Constraint é última linha de defesa.
 9. RLS: toda tabela em `public` habilita e força RLS. Funções auxiliares de autorização vivem no schema privado `app_private`.
-10. Eventos: transação grava `outbox_events`; workers futuros convertem eventos em `notification_jobs`, sem acoplar canal.
+10. Eventos: a transação grava somente `outbox_events`; integrações futuras consomem essa fila sem adicionar tabelas antecipadamente.
 11. Cache: páginas públicas estáveis podem revalidar; disponibilidade e páginas autenticadas usam `no-store`.
 12. Temas: tokens validados e enums de layout; sem CSS/HTML/JavaScript arbitrário.
 

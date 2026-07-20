@@ -72,7 +72,7 @@ export const getPublicTenant = cache(async (slug: string): Promise<PublicTenant 
   const { data, error } = await supabase
     .from("tenants")
     .select(
-      "id, slug, name, timezone, currency, tenant_profiles(description, logo_url, cover_url, phone, email), theme_settings(primary_color, accent_color, background_color, surface_color, text_color, header_alignment, summary_position, service_view, density, cover_style), locations(id, name, address_line_1, address_line_2, district, city, region, postal_code, is_primary)",
+      "id, slug, name, timezone, currency, tenant_profiles(description, logo_url, cover_url, phone, email), theme_settings(primary_color, accent_color, background_color, surface_color, text_color, header_alignment, summary_position, service_view, density, cover_style), locations:locations!locations_tenant_id_fkey(id, name, address_line_1, address_line_2, district, city, region, postal_code, is_primary)",
     )
     .eq("slug", slug)
     .eq("state", "published")
