@@ -38,7 +38,7 @@ export default async function HomePage() {
         <p className="hidden text-sm text-zinc-500 lg:block">Agenda · Ambiente administrativo seguro</p>
       </section>
 
-      <section className="flex items-center justify-center bg-[#f6f7f8] px-5 py-12 sm:px-10">
+      <section className="flex items-center justify-center bg-[var(--background)] px-5 py-12 sm:px-10">
         <div className="w-full max-w-md">
           <div className="mb-9">
             <p className="text-sm font-semibold text-zinc-500">Bem-vindo de volta</p>

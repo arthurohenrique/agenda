@@ -38,7 +38,7 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
   if (!booking || booking.tenantSlug !== slug) notFound();
 
   return (
-    <main className="min-h-dvh bg-[#f6f7f8] px-5 py-10 sm:py-16">
+    <main className="min-h-dvh bg-[var(--background)] px-5 py-10 sm:py-16">
       <div className="mx-auto max-w-2xl">
         <Link className="text-sm font-bold text-zinc-600 hover:text-zinc-950" href={`/${slug}`}>
           ← {booking.tenantName}
@@ -89,6 +89,7 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
             canCancel={booking.canCancel}
             canReschedule={booking.canReschedule}
             initialDate={formatInTimeZone(new Date(), booking.timezone, "yyyy-MM-dd")}
+            key={booking.status}
             tenantSlug={booking.tenantSlug}
             timezone={booking.timezone}
             token={token}

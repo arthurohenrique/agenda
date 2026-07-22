@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isTrustedMutationRequest } from "@/lib/security/origin";
 
 function request(headers: Record<string, string> = {}) {
@@ -8,6 +8,10 @@ function request(headers: Record<string, string> = {}) {
 describe("isTrustedMutationRequest", () => {
   const appUrl = "https://agenda.example.com";
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("accepts the configured origin", () => {
     expect(isTrustedMutationRequest(request({ origin: appUrl }), appUrl)).toBe(true);
   });
@@ -15,6 +19,26 @@ describe("isTrustedMutationRequest", () => {
   it("rejects another origin", () => {
     expect(
       isTrustedMutationRequest(request({ origin: "https://evil.example" }), appUrl),
+    ).toBe(false);
+  });
+
+  it("accepts equivalent loopback origins during development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(
+      isTrustedMutationRequest(
+        request({ origin: "http://127.0.0.1:3000" }),
+        "http://localhost:3000",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects loopback origins using another port", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(
+      isTrustedMutationRequest(
+        request({ origin: "http://127.0.0.1:3001" }),
+        "http://localhost:3000",
+      ),
     ).toBe(false);
   });
 

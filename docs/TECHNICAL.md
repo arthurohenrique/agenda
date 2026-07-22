@@ -31,6 +31,12 @@ flowchart LR
 Server Components são o padrão. Componentes cliente são usados em formulários,
 Realtime e fluxos com estado local.
 
+A interface acompanha automaticamente `prefers-color-scheme` do sistema operacional.
+No modo escuro, o canvas usa preto verdadeiro (`#000000`), superfícies elevadas usam
+pretos neutros e os estados semânticos mantêm contraste próprio. A página pública
+preserva as cores de marca do tenant, mas adapta fundo, superfície, texto e bordas ao
+tema escuro do dispositivo.
+
 ## 3. Configuração
 
 Requisitos:

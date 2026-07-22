@@ -2,7 +2,7 @@ import Link from "next/link";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { fromZonedTime } from "date-fns-tz";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AgendaBoard } from "@/components/admin/agenda-board";
 import { AgendaRealtime } from "@/components/admin/agenda-realtime";
 import { QuickBooking } from "@/components/admin/quick-booking";
@@ -41,30 +41,26 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
   const nextDate = format(addDays(date, view === "week" ? 7 : view === "month" ? 30 : 1), "yyyy-MM-dd");
   const today = format(new Date(), "yyyy-MM-dd");
   const canOperate = ["owner", "admin", "receptionist"].includes(tenant.role);
+  const periodLabel =
+    view === "day"
+      ? format(date, "EEEE, d 'de' MMMM", { locale: ptBR })
+      : view === "week"
+        ? `Semana de ${format(localStart, "d 'de' MMMM", { locale: ptBR })}`
+        : format(date, "MMMM 'de' yyyy", { locale: ptBR });
 
   return (
-    <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <div className="mx-auto max-w-7xl">
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-zinc-500">Operação</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-[-0.035em] sm:text-4xl">Agenda</h1>
-            <p className="mt-2 text-sm capitalize text-zinc-500">
-              {view === "day"
-                ? format(date, "EEEE, d 'de' MMMM", { locale: ptBR })
-                : `${appointments.length} atendimentos no período`}
-            </p>
+            <p className="text-sm font-semibold text-zinc-500">Agenda</p>
+            <h1 className="mt-1 text-xl font-bold capitalize tracking-[-0.025em] sm:text-2xl">{periodLabel}</h1>
           </div>
-          <div className="flex gap-2">
-            <label className="relative hidden sm:block">
-              <span className="sr-only">Buscar cliente</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" size={17} />
-              <input className="min-h-11 w-52 rounded-xl border border-zinc-200 bg-white pl-10 pr-3 text-sm" placeholder="Buscar cliente" type="search" />
-            </label>
+          <div className="flex items-center gap-2">
             {canOperate ? (
               <>
                 <QuickBooking
-                  initialDate={today}
+                  initialDate={selectedDate}
                   locationId={locationId}
                   services={services}
                   slug={slug}
@@ -75,10 +71,10 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
               </>
             ) : null}
           </div>
-        </div>
+        </header>
 
-        <div className="mt-7 flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-1">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-zinc-200 py-3">
+          <div className="flex items-center gap-1" aria-label="Navegação de período">
             <Link className="grid size-10 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${previousDate}&view=${view}`} aria-label="Período anterior">
               <ChevronLeft aria-hidden="true" size={20} />
             </Link>
@@ -89,7 +85,7 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
               <ChevronRight aria-hidden="true" size={20} />
             </Link>
           </div>
-          <div className="grid grid-cols-3 rounded-xl bg-zinc-100 p-1 text-sm font-semibold">
+          <div className="grid grid-cols-3 rounded-xl bg-zinc-100 p-1 text-sm font-semibold" aria-label="Modo de visualização">
             {(["day", "week", "month"] as const).map((item) => (
               <Link
                 className={`rounded-lg px-4 py-2 text-center ${view === item ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-950"}`}
@@ -104,7 +100,13 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
 
         <section className="mt-4" aria-label="Agenda">
           <AgendaRealtime tenantId={tenant.id} />
-          <AgendaBoard appointments={appointments} currency={tenant.currency} slug={slug} timezone={tenant.timezone} />
+          <AgendaBoard
+            appointments={appointments}
+            currency={tenant.currency}
+            periodLabel={periodLabel}
+            slug={slug}
+            timezone={tenant.timezone}
+          />
         </section>
       </div>
     </main>

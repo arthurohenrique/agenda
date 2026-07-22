@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingPage() {
   await requireUser();
   return (
-    <main className="min-h-dvh bg-[#f6f7f8] px-5 py-8 sm:px-8 sm:py-12">
+    <main className="min-h-dvh bg-[var(--background)] px-5 py-8 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-5xl">
         <header className="flex items-center justify-between gap-4">
           <Brand />

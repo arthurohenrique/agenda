@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --background: #f6f7f8;
   --surface: #ffffff;
   --foreground: #151719;
@@ -14,6 +15,22 @@
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #000000;
+    --surface: #0a0a0a;
+    --foreground: #fafafa;
+    --muted: #a1a1aa;
+    --border: #27272a;
+    --primary: #fafafa;
+    --primary-foreground: #09090b;
+    --focus: #60a5fa;
+    --danger: #fca5a5;
+    --success: #86efac;
+  }
 }
 
 * {
@@ -42,6 +59,12 @@ textarea {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  color: inherit;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;
@@ -61,6 +84,222 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 14px 45px rgb(0 0 0 / 5%);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Keep the existing utility palette readable while using true black for the app canvas. */
+  .bg-white,
+  .bg-white\/95 {
+    background-color: var(--surface);
+  }
+
+  .bg-zinc-50 {
+    background-color: #0a0a0a;
+  }
+
+  .bg-zinc-100 {
+    background-color: #18181b;
+  }
+
+  .bg-zinc-200 {
+    background-color: #27272a;
+  }
+
+  .bg-zinc-300,
+  .disabled\:bg-zinc-300:disabled,
+  .disabled\:bg-zinc-400:disabled {
+    background-color: #3f3f46;
+  }
+
+  .text-zinc-950,
+  .text-zinc-900 {
+    color: #fafafa;
+  }
+
+  .text-zinc-800 {
+    color: #e4e4e7;
+  }
+
+  .text-zinc-700 {
+    color: #d4d4d8;
+  }
+
+  .text-zinc-600,
+  .text-zinc-500 {
+    color: #a1a1aa;
+  }
+
+  .text-zinc-400 {
+    color: #71717a;
+  }
+
+  .border-zinc-100,
+  .divide-zinc-100 > :not(:last-child) {
+    border-color: #1f1f22;
+  }
+
+  .border-zinc-200,
+  .divide-zinc-200 > :not(:last-child) {
+    border-color: #27272a;
+  }
+
+  .border-zinc-300 {
+    border-color: #3f3f46;
+  }
+
+  .border-zinc-400 {
+    border-color: #52525b;
+  }
+
+  .hover\:bg-white:hover,
+  .hover\:bg-zinc-50:hover,
+  .hover\:bg-zinc-100:hover {
+    background-color: #18181b;
+  }
+
+  .hover\:text-zinc-950:hover {
+    color: #ffffff;
+  }
+
+  .hover\:border-zinc-300:hover,
+  .hover\:border-zinc-400:hover {
+    border-color: #52525b;
+  }
+
+  button.bg-zinc-950,
+  a.bg-zinc-950 {
+    background-color: #fafafa;
+    color: #09090b;
+  }
+
+  button.bg-zinc-950:disabled {
+    background-color: #3f3f46;
+    color: #a1a1aa;
+  }
+
+  .shadow-sm,
+  .shadow-md,
+  .shadow-xl,
+  .shadow-2xl {
+    --tw-shadow-color: rgb(0 0 0 / 70%);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea {
+    background-color: #0a0a0a;
+    border-color: #3f3f46;
+    color: #fafafa;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #71717a;
+  }
+
+  /* Semantic feedback colors use dark-tinted surfaces instead of pale cards. */
+  .bg-blue-50 {
+    background-color: #07152f;
+  }
+
+  .bg-blue-100 {
+    background-color: #102a56;
+  }
+
+  .border-blue-200 {
+    border-color: #1e3a5f;
+  }
+
+  .text-blue-950,
+  .text-blue-900,
+  .text-blue-900\/75,
+  .text-blue-900\/70,
+  .text-blue-800,
+  .text-blue-700 {
+    color: #93c5fd;
+  }
+
+  .bg-green-50 {
+    background-color: #071b11;
+  }
+
+  .border-green-200 {
+    border-color: #14532d;
+  }
+
+  .text-green-800,
+  .text-green-700 {
+    color: #86efac;
+  }
+
+  .bg-amber-50,
+  .bg-orange-50 {
+    background-color: #211405;
+  }
+
+  .border-amber-200,
+  .border-orange-200 {
+    border-color: #78350f;
+  }
+
+  .text-amber-900,
+  .text-amber-800,
+  .text-amber-700,
+  .text-orange-800 {
+    color: #fcd34d;
+  }
+
+  .bg-red-50 {
+    background-color: #260909;
+  }
+
+  .border-red-200 {
+    border-color: #7f1d1d;
+  }
+
+  .text-red-950,
+  .text-red-900,
+  .text-red-900\/75,
+  .text-red-800,
+  .text-red-700 {
+    color: #fca5a5;
+  }
+
+  .hover\:bg-red-50:hover {
+    background-color: #3b0a0a;
+  }
+
+  .bg-violet-50,
+  .bg-purple-50 {
+    background-color: #1b1033;
+  }
+
+  .border-violet-200,
+  .border-purple-200 {
+    border-color: #4c1d95;
+  }
+
+  .text-violet-800,
+  .text-purple-800 {
+    color: #c4b5fd;
+  }
+
+  .booking-theme {
+    --booking-accent: color-mix(in srgb, var(--booking-accent-brand) 55%, white) !important;
+    --booking-background: #000000 !important;
+    --booking-surface: #0a0a0a !important;
+    --booking-text: #fafafa !important;
+    --booking-border: rgb(255 255 255 / 12%) !important;
+    --booking-border-strong: rgb(255 255 255 / 28%) !important;
+    --booking-hover: rgb(255 255 255 / 6%) !important;
+    --booking-skeleton: rgb(255 255 255 / 10%) !important;
+    background: #000000 !important;
+    color: #fafafa !important;
+  }
+
+  .booking-theme [class*="bg-[var(--booking-primary)]"] {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
+  }
 }
 
 .sr-only {

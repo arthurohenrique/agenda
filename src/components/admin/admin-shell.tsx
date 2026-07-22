@@ -32,7 +32,7 @@ export function AdminShell({
   tenant: TenantContext;
 }) {
   return (
-    <div className="min-h-dvh bg-[#f6f7f8] text-zinc-950">
+    <div className="min-h-dvh bg-[var(--background)] text-zinc-950">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-zinc-200 bg-white p-4 lg:flex">
         <div className="px-2 py-3">
           <Brand />

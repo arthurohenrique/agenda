@@ -138,7 +138,7 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
 
       {open ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }} role="presentation">
-          <section aria-labelledby="quick-booking-title" aria-modal="true" className="h-dvh w-full max-w-lg overflow-y-auto bg-[#f6f7f8] p-5 shadow-2xl sm:p-7" role="dialog">
+          <section aria-labelledby="quick-booking-title" aria-modal="true" className="h-dvh w-full max-w-lg overflow-y-auto bg-[var(--background)] p-5 shadow-2xl sm:p-7" role="dialog">
             <header className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-zinc-500">Cadastro rápido</p><h2 className="mt-1 text-2xl font-bold tracking-tight" id="quick-booking-title">Novo agendamento</h2></div><button aria-label="Fechar" className="grid size-11 place-items-center rounded-xl hover:bg-white" onClick={() => setOpen(false)} type="button"><X aria-hidden="true" size={21} /></button></header>
             <form className="mt-7 grid gap-5" onSubmit={submit}>
               <label className="grid gap-2 text-sm font-semibold">Serviço<select className="min-h-12 rounded-xl border border-zinc-200 bg-white px-3" onChange={(event) => refreshAvailability({ serviceId: event.target.value, staffId: null })} value={serviceId}>{activeServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>

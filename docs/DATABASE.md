@@ -46,3 +46,7 @@ usar as colunas `jsonb` já existentes nas entidades principais.
 
 - `0016_simplify_schema.sql`: remove módulos sem fluxo ativo.
 - `0017_outbox_worker.sql`: adiciona consumo transacional sem criar tabela.
+- `0018_fix_public_booking_contact_validation.sql`: corrige a validação de telefone
+  E.164 e e-mail na RPC transacional de reserva pública.
+- `0019_ensure_agenda_realtime.sql`: garante publicação Realtime e identidade de
+  réplica para agendamentos e bloqueios.

@@ -107,6 +107,8 @@ a entrega necessária.
 - `0011–0015`: onboarding, administração, reserva interna, Realtime e reagendamento.
 - `0016`: simplificação do schema.
 - `0017`: lease, conclusão e retry da outbox.
+- `0018`: validação de contatos na reserva pública.
+- `0019`: publicação Realtime da agenda e dos bloqueios.
 
 Migrations aplicadas não são reescritas. Toda mudança futura recebe novo número,
 grants explícitos, teste e atualização de `DATABASE.md`.

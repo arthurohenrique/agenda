@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import { formatInTimeZone } from "date-fns-tz";
-import { MapPin, Phone } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/booking/booking-flow";
 import {
@@ -56,11 +56,17 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
   ]);
   const initialDate = formatInTimeZone(new Date(), tenant.timezone, "yyyy-MM-dd");
   const themeStyle = {
+    "--booking-primary-brand": tenant.theme.primary,
+    "--booking-accent-brand": tenant.theme.accent,
     "--booking-primary": tenant.theme.primary,
     "--booking-accent": tenant.theme.accent,
     "--booking-background": tenant.theme.background,
     "--booking-surface": tenant.theme.surface,
     "--booking-text": tenant.theme.text,
+    "--booking-border": "rgb(0 0 0 / 10%)",
+    "--booking-border-strong": "rgb(0 0 0 / 30%)",
+    "--booking-hover": "rgb(0 0 0 / 5%)",
+    "--booking-skeleton": "rgb(0 0 0 / 10%)",
     background: tenant.theme.background,
     color: tenant.theme.text,
   } as CSSProperties;
@@ -83,40 +89,51 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
   };
 
   return (
-    <main className="min-h-dvh" style={themeStyle}>
+    <main className="booking-theme min-h-dvh" style={themeStyle}>
       <script
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
         type="application/ld+json"
       />
-      <header className="border-b border-black/5 bg-[var(--booking-surface)]">
+      <header className="overflow-hidden bg-[var(--booking-surface)]">
         <div
-          className={`mx-auto flex max-w-6xl flex-col gap-5 px-5 py-8 sm:px-8 sm:py-12 ${
+          className={`mx-auto flex max-w-4xl flex-col px-5 pb-12 pt-16 sm:px-8 sm:pb-16 sm:pt-24 ${
             tenant.theme.headerAlignment === "center" ? "items-center text-center" : "items-start"
           }`}
         >
-          <div className="grid size-16 place-items-center rounded-2xl bg-[var(--booking-primary)] text-2xl font-bold text-white shadow-sm">
-            {tenant.name.slice(0, 1).toUpperCase()}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-[var(--booking-accent)]">Agendamento online</p>
-            <h1 className="mt-2 text-4xl font-bold tracking-[-0.045em] sm:text-5xl">{tenant.name}</h1>
-            {tenant.description ? (
-              <p className="mt-4 max-w-2xl text-base leading-7 opacity-65">{tenant.description}</p>
-            ) : null}
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm opacity-65">
-              <span className="inline-flex items-center gap-2">
-                <MapPin aria-hidden="true" size={16} />
-                {tenant.location.district ? `${tenant.location.district}, ` : ""}
-                {tenant.location.city}
+          <div className="flex items-center gap-3">
+            {tenant.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured.
+              <img alt={`Logo ${tenant.name}`} className="size-10 rounded-xl border border-[var(--booking-border)] bg-white object-cover" src={tenant.logoUrl} />
+            ) : (
+              <span className="grid size-10 place-items-center rounded-xl bg-[var(--booking-primary)] text-sm font-bold text-white">
+                {tenant.name.slice(0, 1).toUpperCase()}
               </span>
-              {tenant.phone ? (
-                <span className="inline-flex items-center gap-2">
-                  <Phone aria-hidden="true" size={16} /> {tenant.phone}
-                </span>
-              ) : null}
+            )}
+            <p className="text-sm font-medium opacity-60">Agendamento online</p>
+          </div>
+
+          <div className="mt-12 max-w-3xl sm:mt-16">
+            <p className="text-sm font-semibold text-[var(--booking-accent)]">Reserve seu horário</p>
+            <h1 className="mt-4 text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl lg:text-8xl">{tenant.name}</h1>
+            {tenant.description ? <p className="mt-6 max-w-2xl text-lg leading-8 opacity-65">{tenant.description}</p> : null}
+          </div>
+
+          <p className="mt-10 inline-flex items-center gap-2 text-sm opacity-60">
+            <MapPin aria-hidden="true" size={16} />
+            {tenant.location.district ? `${tenant.location.district}, ` : ""}
+            {tenant.location.city}
+          </p>
+        </div>
+        {tenant.coverUrl ? (
+          <div className="mx-auto max-w-6xl px-5 pb-6 sm:px-8 sm:pb-8">
+            <div className="overflow-hidden rounded-[2rem] bg-[var(--booking-hover)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured. */}
+              <img alt="" className="h-56 w-full object-cover sm:h-80" src={tenant.coverUrl} />
             </div>
           </div>
-        </div>
+        ) : (
+          <div aria-hidden="true" className="mx-auto h-px max-w-6xl bg-[var(--booking-border)]" />
+        )}
       </header>
 
       {services.length ? (

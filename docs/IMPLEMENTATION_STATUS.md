@@ -35,10 +35,10 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 
 - ESLint: aprovado.
 - TypeScript strict: aprovado.
-- 28 testes unitários: aprovados.
+- 30 testes unitários: aprovados.
 - Build Next.js de produção: aprovado.
 - Consulta anônima real: tenants publicados visíveis; quatro tabelas privadas `401`.
-- Migrations atuais: 17.
+- Migrations atuais: 19.
 - Lockfile e versões diretas: fixados em versões publicadas.
 - `npm audit`: zero alto/crítico; dois moderados conhecidos.
 
