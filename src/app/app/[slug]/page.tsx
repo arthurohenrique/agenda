@@ -7,7 +7,7 @@ import { AgendaBoard } from "@/components/admin/agenda-board";
 import { AgendaRealtime } from "@/components/admin/agenda-realtime";
 import { QuickBooking } from "@/components/admin/quick-booking";
 import { QuickBlock } from "@/components/admin/quick-block";
-import { getAppointments } from "@/features/appointments/queries";
+import { getAppointments, getCalendarBlocks } from "@/features/appointments/queries";
 import { getAdminServices, getAdminStaff, getPrimaryLocationId } from "@/features/catalog/admin-queries";
 import { requireTenantAccess } from "@/features/tenants/access";
 
@@ -31,8 +31,9 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
   const localEnd = addDays(localStart, days);
   const rangeStart = fromZonedTime(format(localStart, "yyyy-MM-dd'T'00:00:00"), tenant.timezone).toISOString();
   const rangeEnd = fromZonedTime(format(localEnd, "yyyy-MM-dd'T'00:00:00"), tenant.timezone).toISOString();
-  const [appointments, services, staff, locationId] = await Promise.all([
+  const [appointments, blocks, services, staff, locationId] = await Promise.all([
     getAppointments(tenant.id, rangeStart, rangeEnd),
+    getCalendarBlocks(tenant.id, rangeStart, rangeEnd),
     getAdminServices(tenant.id),
     getAdminStaff(tenant.id),
     getPrimaryLocationId(tenant.id),
@@ -67,7 +68,7 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
                   staff={staff}
                   timezone={tenant.timezone}
                 />
-                <QuickBlock date={selectedDate} locationId={locationId} slug={slug} staff={staff} />
+                <QuickBlock blocks={blocks} date={selectedDate} locationId={locationId} slug={slug} staff={staff} timezone={tenant.timezone} />
               </>
             ) : null}
           </div>

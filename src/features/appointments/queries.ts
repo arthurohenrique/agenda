@@ -27,6 +27,22 @@ export interface AgendaStaff {
   color: string;
 }
 
+const calendarBlockSchema = z.object({
+  id: z.guid(),
+  starts_at: z.string(),
+  ends_at: z.string(),
+  title: z.string(),
+  staff: z.object({ name: z.string() }).nullable(),
+});
+
+export type AgendaCalendarBlock = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  title: string;
+  staffName: string | null;
+};
+
 export async function getAppointments(
   tenantId: string,
   rangeStart: string,
@@ -70,4 +86,27 @@ export async function getAgendaStaff(tenantId: string): Promise<AgendaStaff[]> {
 
   if (error) throw new Error("Não foi possível carregar a equipe.");
   return z.array(staffSchema).parse(data ?? []);
+}
+
+export async function getCalendarBlocks(
+  tenantId: string,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<AgendaCalendarBlock[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("calendar_blocks")
+    .select("id, starts_at, ends_at, title, staff(name)")
+    .eq("tenant_id", tenantId)
+    .lt("starts_at", rangeEnd)
+    .gt("ends_at", rangeStart)
+    .order("starts_at");
+  if (error) throw new Error("Não foi possível carregar os bloqueios.");
+  return z.array(calendarBlockSchema).parse(data ?? []).map((block) => ({
+    id: block.id,
+    startsAt: block.starts_at,
+    endsAt: block.ends_at,
+    title: block.title,
+    staffName: block.staff?.name ?? null,
+  }));
 }
