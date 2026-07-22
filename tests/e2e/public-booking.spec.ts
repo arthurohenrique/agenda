@@ -9,9 +9,9 @@ test.describe("agendamento público", () => {
   test("cliente conclui fluxo sem senha", async ({ page }, testInfo) => {
     await page.goto("/barbearia-central");
     await expect(page.getByRole("heading", { name: "Barbearia Central" })).toBeVisible();
-    await page.getByRole("button", { name: /Corte personalizado/ }).click();
+    await page.getByRole("button", { name: /Corte 45 min/ }).click();
     const nextBusinessDay = addDays(new Date(), new Date().getDay() === 6 ? 2 : 1);
-    await page.getByLabel("Data").fill(format(nextBusinessDay, "yyyy-MM-dd"));
+    await page.getByLabel("Escolher outra data").fill(format(nextBusinessDay, "yyyy-MM-dd"));
     const slot = page.locator('button[aria-label*="com"]').first();
     await expect(slot).toBeVisible();
     await slot.click();
@@ -19,8 +19,8 @@ test.describe("agendamento público", () => {
     await page.getByLabel("Telefone com DDD").fill(
       testInfo.project.name === "mobile" ? "(11) 98888-1002" : "(11) 98888-1001",
     );
-    await page.getByRole("button", { name: "Revisar e confirmar" }).click();
-    await expect(page.getByRole("heading", { name: /Tudo certo|Aguarde a confirmação/ })).toBeVisible();
+    await page.getByRole("button", { name: "Confirmar agendamento" }).click();
+    await expect(page.getByRole("heading", { name: /Já estamos cuidando disso|Seu horário está reservado/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Gerenciar agendamento" })).toBeVisible();
   });
 });

@@ -15,7 +15,7 @@ test.describe("autenticação com banco local", () => {
   test("usuário de um tenant abre diretamente a agenda", async ({ page }) => {
     await login(page, "dono.barbearia@agenda.local");
     await expect(page).toHaveURL(/\/app\/barbearia-central/);
-    await expect(page.getByRole("heading", { name: "Agenda" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Agenda" })).toBeVisible();
   });
 
   test("usuário multi-tenant escolhe estabelecimento", async ({ page }) => {
@@ -27,6 +27,7 @@ test.describe("autenticação com banco local", () => {
 
   test("slug não concede acesso a outro tenant", async ({ page }) => {
     await login(page, "dono.barbearia@agenda.local");
+    await expect(page).toHaveURL(/\/app\/barbearia-central/);
     await page.goto("/app/salao-da-ana");
     await expect(page.getByRole("heading", { name: "Agenda não encontrada" })).toBeVisible();
   });
