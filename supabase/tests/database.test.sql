@@ -30,7 +30,15 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","app_metadata":{}}',
   true
 );
-select is((select count(*)::integer from public.tenant_members), 1, 'Owner vê apenas associações permitidas');
+select is(
+  (
+    select count(*)::integer
+    from public.tenant_members
+    where tenant_id = '20000000-0000-0000-0000-000000000002'
+  ),
+  0,
+  'Owner não vê associações de outro tenant'
+);
 select is(
   (select count(*)::integer from public.customer_tenants where tenant_id = '20000000-0000-0000-0000-000000000002'),
   0,
