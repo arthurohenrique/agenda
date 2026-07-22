@@ -11,38 +11,59 @@ export function AgendaRealtime({ tenantId }: { tenantId: string }) {
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`agenda:${tenantId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "appointments",
-          filter: `tenant_id=eq.${tenantId}`,
-        },
-        () => {
-          setMessage("Agenda atualizada por outra sessão.");
-          router.refresh();
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "calendar_blocks",
-          filter: `tenant_id=eq.${tenantId}`,
-        },
-        () => {
-          setMessage("Bloqueios da agenda foram atualizados.");
-          router.refresh();
-        },
-      )
-      .subscribe();
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    async function subscribeToAgenda() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active) return;
+
+      if (!session) {
+        setMessage("Não foi possível conectar atualizações em tempo real.");
+        return;
+      }
+
+      supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`agenda:${tenantId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "appointments",
+            filter: `tenant_id=eq.${tenantId}`,
+          },
+          () => {
+            setMessage("Agenda atualizada por outra sessão.");
+            router.refresh();
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "calendar_blocks",
+            filter: `tenant_id=eq.${tenantId}`,
+          },
+          () => {
+            setMessage("Bloqueios da agenda foram atualizados.");
+            router.refresh();
+          },
+        )
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setMessage("Não foi possível conectar atualizações em tempo real.");
+          }
+        });
+    }
+
+    void subscribeToAgenda();
 
     return () => {
-      void supabase.removeChannel(channel);
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [router, tenantId]);
 
