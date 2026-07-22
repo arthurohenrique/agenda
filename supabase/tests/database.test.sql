@@ -15,9 +15,13 @@ select ok(
   'Todas as tabelas públicas possuem RLS'
 );
 
+select ok(
+  not has_table_privilege('anon', 'public.customers', 'SELECT'),
+  'Anon não possui privilégio para enumerar clientes'
+);
+
 set local role anon;
 select is((select count(*)::integer from public.tenants), 3, 'Anon vê somente tenants publicados');
-select is((select count(*)::integer from public.customers), 0, 'Anon não enumera clientes');
 reset role;
 
 set local role authenticated;

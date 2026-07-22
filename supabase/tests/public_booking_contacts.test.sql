@@ -31,7 +31,7 @@ select ok(
       'contato.teste@example.com',
       null,
       'a1000000-0000-4000-8000-000000000001',
-      'contact-e164-valid'
+      'contact-e164-valid-rate-key-000001'
     ) ->> 'appointmentId') is not null
     from public_booking_contact_context
   ),
@@ -52,7 +52,7 @@ select throws_ok(
       null,
       null,
       'a1000000-0000-4000-8000-000000000002',
-      'contact-e164-invalid'
+      'contact-e164-invalid-rate-key-0002'
     )
   $$,
   '22023',
