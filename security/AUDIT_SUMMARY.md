@@ -20,10 +20,10 @@ Data: 20 de julho de 2026
 | 14 | File uploads | N/A |
 | 15 | Error handling | PASS |
 | 16 | Password hashing | N/A |
-| 17 | Dependencies | MEDIUM |
+| 17 | Dependencies | PASS |
 
 Nenhum achado crítico ou alto. Relatórios e planos ficam nas pastas homônimas.
 
 Pendências humanas: rotacionar segredo já compartilhado, remover contas demo do
-projeto real, configurar rate limit/CAPTCHA do Supabase, validar RLS externamente,
-conferir headers no domínio e acompanhar advisory transitivo do PostCSS.
+projeto real, configurar rate limit/CAPTCHA do Supabase, validar RLS externamente e
+conferir headers no domínio.

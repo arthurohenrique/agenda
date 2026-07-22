@@ -26,8 +26,7 @@ Data de referência: 20 de julho de 2026.
 - RLS privada validada externamente com chave publicável no Supabase real.
 - API administrativa retorna `401` sem sessão e `403` sem papel/origem.
 - CSP, HSTS, anti-frame, nosniff e referrer policy confirmados no build local.
-- Dois riscos médios documentados: rate limit de Auth depende de configuração externa;
-  PostCSS transitivo possui advisory moderado sem correção compatível.
+- Um risco médio documentado: rate limit de Auth depende de configuração externa.
 
 Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 
@@ -40,7 +39,7 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 - Consulta anônima real: tenants publicados visíveis; quatro tabelas privadas `401`.
 - Migrations atuais: 19.
 - Lockfile e versões diretas: fixados em versões publicadas.
-- `npm audit`: zero alto/crítico; dois moderados conhecidos.
+- `npm audit`: zero vulnerabilidades.
 
 ## Bloqueios locais
 
