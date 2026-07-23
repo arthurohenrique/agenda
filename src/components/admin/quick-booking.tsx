@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, CheckCircle2, Clock3, X } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Clock3, UserRoundCheck, X } from "lucide-react";
 import { z } from "zod";
 import { formatTimeInTimezone, localDateBounds } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -16,9 +16,11 @@ interface QuickBookingProps {
   initialDate: string;
   services: AdminService[];
   staff: AdminStaff[];
+  mode?: "booking" | "walk_in";
 }
 
-export function QuickBooking({ slug, timezone, locationId, initialDate, services, staff }: QuickBookingProps) {
+export function QuickBooking({ slug, timezone, locationId, initialDate, services, staff, mode = "booking" }: QuickBookingProps) {
+  const isWalkIn = mode === "walk_in";
   const router = useRouter();
   const activeServices = services.filter((service) => service.is_active);
   const [open, setOpen] = useState(false);
@@ -42,7 +44,6 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
     const controller = new AbortController();
     const bounds = localDateBounds(date, timezone);
     const params = new URLSearchParams({
-      slug,
       locationId,
       serviceId,
       dateFrom: bounds.from,
@@ -51,7 +52,7 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
     });
     if (staffId) params.set("staffId", staffId);
 
-    fetch(`/api/public/availability?${params}`, { cache: "no-store", signal: controller.signal })
+    fetch(`/api/app/${slug}/availability?${params}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload: unknown = await response.json();
         if (!response.ok) throw new Error("availability_failed");
@@ -104,6 +105,7 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
         customerEmail: formData.get("customerEmail"),
         customerNotes: "",
         internalNotes: formData.get("internalNotes"),
+        walkIn: isWalkIn,
         idempotencyKey: crypto.randomUUID(),
       }),
     });
@@ -116,14 +118,17 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
     }
     setOpen(false);
     setSubmitting(false);
-    setStatusMessage("Agendamento criado e agenda atualizada.");
+    setStatusMessage(isWalkIn ? "Chegada registrada e agenda atualizada." : "Agendamento criado e agenda atualizada.");
     router.refresh();
   }
 
   return (
     <>
       <button
-        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-bold text-white disabled:bg-zinc-400"
+        className={cn(
+          "inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold disabled:bg-zinc-400",
+          isWalkIn ? "border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50" : "bg-zinc-950 text-white",
+        )}
         disabled={!locationId || !activeServices.length}
         onClick={() => {
           setOpen(true);
@@ -132,14 +137,15 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
         }}
         type="button"
       >
-        <CalendarPlus aria-hidden="true" size={18} /> Novo agendamento
+        {isWalkIn ? <UserRoundCheck aria-hidden="true" size={18} /> : <CalendarPlus aria-hidden="true" size={18} />}
+        {isWalkIn ? "Cliente presente" : "Novo agendamento"}
       </button>
       {statusMessage ? <span className="sr-only" role="status">{statusMessage}</span> : null}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }} role="presentation">
           <section aria-labelledby="quick-booking-title" aria-modal="true" className="h-dvh w-full max-w-lg overflow-y-auto bg-[var(--background)] p-5 shadow-2xl sm:p-7" role="dialog">
-            <header className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-zinc-500">Cadastro rápido</p><h2 className="mt-1 text-2xl font-bold tracking-tight" id="quick-booking-title">Novo agendamento</h2></div><button aria-label="Fechar" className="grid size-11 place-items-center rounded-xl hover:bg-white" onClick={() => setOpen(false)} type="button"><X aria-hidden="true" size={21} /></button></header>
+            <header className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-zinc-500">{isWalkIn ? "Atendimento sem reserva" : "Cadastro rápido"}</p><h2 className="mt-1 text-2xl font-bold tracking-tight" id="quick-booking-title">{isWalkIn ? "Registrar cliente presente" : "Novo agendamento"}</h2>{isWalkIn ? <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-500">Reserve primeiro horário livre e registre chegada agora. Nada é alterado sem validar disponibilidade.</p> : null}</div><button aria-label="Fechar" className="grid size-11 place-items-center rounded-xl hover:bg-white" onClick={() => setOpen(false)} type="button"><X aria-hidden="true" size={21} /></button></header>
             <form className="mt-7 grid gap-5" onSubmit={submit}>
               <label className="grid gap-2 text-sm font-semibold">Serviço<select className="min-h-12 rounded-xl border border-zinc-200 bg-white px-3" onChange={(event) => refreshAvailability({ serviceId: event.target.value, staffId: null })} value={serviceId}>{activeServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
               <label className="grid gap-2 text-sm font-semibold">Profissional<select className="min-h-12 rounded-xl border border-zinc-200 bg-white px-3" onChange={(event) => refreshAvailability({ staffId: event.target.value || null })} value={staffId ?? ""}><option value="">Qualquer disponível</option>{eligibleStaff.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
@@ -148,8 +154,8 @@ export function QuickBooking({ slug, timezone, locationId, initialDate, services
               {slot ? <p className="flex items-center gap-2 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-800"><Clock3 aria-hidden="true" size={17} />{formatTimeInTimezone(slot.startAt, timezone)} com {slot.staffName}</p> : null}
               <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-white p-5"><label className="grid gap-2 text-sm font-semibold">Cliente<input className="min-h-11 rounded-xl border border-zinc-200 px-3" autoComplete="name" name="customerName" required /></label><label className="grid gap-2 text-sm font-semibold">Telefone<input className="min-h-11 rounded-xl border border-zinc-200 px-3" autoComplete="tel" inputMode="tel" name="customerPhone" placeholder="(11) 99999-9999" required /></label><label className="grid gap-2 text-sm font-semibold">E-mail <span className="font-normal text-zinc-500">(opcional)</span><input className="min-h-11 rounded-xl border border-zinc-200 px-3" autoComplete="email" name="customerEmail" type="email" /></label><label className="grid gap-2 text-sm font-semibold">Observação interna <span className="font-normal text-zinc-500">(opcional)</span><textarea className="min-h-20 rounded-xl border border-zinc-200 p-3" maxLength={2000} name="internalNotes" /></label></div>
               {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{error}</p> : null}
-              <button className="min-h-12 rounded-xl bg-zinc-950 px-5 font-bold text-white disabled:bg-zinc-300" disabled={!slot || submitting}>{submitting ? "Criando…" : "Confirmar agendamento"}</button>
-              <p className="flex items-center gap-2 text-xs text-zinc-500"><CheckCircle2 aria-hidden="true" size={15} />Disponibilidade será validada novamente ao confirmar.</p>
+              <button className="min-h-12 rounded-xl bg-zinc-950 px-5 font-bold text-white disabled:bg-zinc-300" disabled={!slot || submitting}>{submitting ? "Registrando…" : isWalkIn ? "Registrar chegada" : "Confirmar agendamento"}</button>
+              <p className="flex items-center gap-2 text-xs text-zinc-500"><CheckCircle2 aria-hidden="true" size={15} />{isWalkIn ? "O atendimento entrará como check-in na agenda." : "Disponibilidade será validada novamente ao confirmar."}</p>
             </form>
           </section>
         </div>

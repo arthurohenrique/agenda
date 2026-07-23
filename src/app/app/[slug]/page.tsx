@@ -68,6 +68,15 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
                   staff={staff}
                   timezone={tenant.timezone}
                 />
+                <QuickBooking
+                  initialDate={selectedDate}
+                  locationId={locationId}
+                  mode="walk_in"
+                  services={services}
+                  slug={slug}
+                  staff={staff}
+                  timezone={tenant.timezone}
+                />
                 <QuickBlock blocks={blocks} date={selectedDate} locationId={locationId} slug={slug} staff={staff} timezone={tenant.timezone} />
               </>
             ) : null}

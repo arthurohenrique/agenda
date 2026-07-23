@@ -16,6 +16,7 @@ const adminBookingSchema = z.object({
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
   customerNotes: z.string().trim().max(2000).optional().default(""),
   internalNotes: z.string().trim().max(2000).optional().default(""),
+  walkIn: z.boolean().optional().default(false),
   idempotencyKey: z.guid(),
 });
 
@@ -72,5 +73,27 @@ export async function POST(request: NextRequest, { params }: AdminBookingRoutePr
     );
   }
 
-  return NextResponse.json(data, { status: 201 });
+  if (parsed.data.walkIn) {
+    const appointmentId = z.object({ appointmentId: z.guid() }).parse(data).appointmentId;
+    const { error: confirmError } = await supabase.rpc("change_appointment_status", {
+      p_tenant_id: tenant.id,
+      p_appointment_id: appointmentId,
+      p_status: "confirmed",
+      p_reason: null,
+    });
+    if (confirmError && !confirmError.message.includes("invalid_status_transition")) {
+      return NextResponse.json({ error: "Atendimento criado, mas não foi possível registrar a chegada." }, { status: 422 });
+    }
+    const { error: checkInError } = await supabase.rpc("change_appointment_status", {
+      p_tenant_id: tenant.id,
+      p_appointment_id: appointmentId,
+      p_status: "checked_in",
+      p_reason: "Atendimento presencial registrado pela equipe.",
+    });
+    if (checkInError) {
+      return NextResponse.json({ error: "Atendimento criado, mas não foi possível registrar a chegada." }, { status: 422 });
+    }
+  }
+
+  return NextResponse.json({ ...data, walkIn: parsed.data.walkIn }, { status: 201 });
 }
