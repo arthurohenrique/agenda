@@ -88,14 +88,25 @@ Em **Configurações**, o checklist confirma:
 Publique somente quando todos os itens estiverem prontos. Use **Voltar para
 rascunho** para ocultar temporariamente a página pública.
 
-## 10. Relatórios
+## 10. Identidade visual
+
+![Paletas 60-30-10](images/paletas.png)
+
+Owners e admins podem escolher uma das 12 paletas prontas. A faixa mostra a
+proporção 60% base, 30% cor principal e 10% destaque antes de aplicar.
+
+A paleta escolhida muda o painel administrativo e a página pública de
+agendamento. A preferência de tema claro ou escuro continua sendo individual de
+cada dispositivo.
+
+## 11. Relatórios
 
 ![Relatórios](images/relatorios.png)
 
 Os relatórios mostram os últimos 30 dias: agendamentos, receitas, clientes únicos,
 serviços mais agendados, cancelamentos e faltas.
 
-## 11. Boas práticas
+## 12. Boas práticas
 
 - Revise diariamente confirmações pendentes.
 - Use bloqueios em vez de deixar horários incorretos disponíveis.
@@ -104,7 +115,7 @@ serviços mais agendados, cancelamentos e faltas.
 - Use os dados de clientes apenas para administrar atendimentos.
 - Confirme o estabelecimento selecionado antes de alterar dados.
 
-## 12. Ajuda rápida
+## 13. Ajuda rápida
 
 | Situação | Ação recomendada |
 |---|---|

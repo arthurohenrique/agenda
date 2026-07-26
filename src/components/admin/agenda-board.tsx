@@ -62,7 +62,7 @@ export function AgendaBoard({
 
   if (!appointments.length) {
     return (
-      <div className="grid min-h-[420px] place-items-center rounded-2xl border border-dashed border-zinc-300 bg-white px-5 text-center">
+      <div className="premium-card grid min-h-[420px] place-items-center border-dashed px-5 text-center">
         <div>
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-500">
             <Clock3 aria-hidden="true" size={22} />
@@ -78,7 +78,7 @@ export function AgendaBoard({
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
-      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-labelledby="schedule-title">
+      <section className="premium-card overflow-hidden" aria-labelledby="schedule-title">
         <header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 sm:px-5">
           <div>
             <h2 className="font-bold" id="schedule-title">Horários</h2>
@@ -102,7 +102,7 @@ export function AgendaBoard({
                   aria-pressed={isSelected}
                   className={cn(
                     "grid w-full grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left transition sm:px-5",
-                    isSelected ? "bg-zinc-950 text-white" : "hover:bg-zinc-50",
+                    isSelected ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "hover:bg-zinc-50",
                   )}
                   onClick={() => setSelectedId((current) => (current === appointment.id ? null : appointment.id))}
                   type="button"
@@ -130,7 +130,7 @@ export function AgendaBoard({
         </ol>
       </section>
 
-      <aside className="rounded-2xl border border-zinc-200 bg-white p-5 xl:sticky xl:top-20" id="appointment-details">
+      <aside className="premium-card p-6 xl:sticky xl:top-24" id="appointment-details">
         {selectedAppointment ? (
           <AppointmentDetails appointment={selectedAppointment} currency={currency} slug={slug} timezone={timezone} />
         ) : (

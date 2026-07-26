@@ -237,7 +237,7 @@ def build():
         ["Serviços", "Preço, duração e publicação"],
         ["Equipe", "Profissionais e serviços habilitados"],
         ["Relatórios", "Indicadores dos últimos 30 dias"],
-        ["Configurações", "Checklist e publicação da página"],
+        ["Configurações", "Checklist, publicação e paleta visual"],
     ]
     table = Table(nav_data, colWidths=[42 * mm, 125 * mm], repeatRows=0)
     table.setStyle(
@@ -361,7 +361,22 @@ def build():
     )
     story.append(PageBreak())
 
-    story.extend(title("7. Relatórios", "Indicadores essenciais dos últimos 30 dias."))
+    story.extend(title("7. Identidade visual", "Uma paleta única deixa painel e página pública coerentes."))
+    story.append(screenshot("paletas.png", 120 * mm))
+    story.append(Spacer(1, 4 * mm))
+    story.extend(
+        bullets(
+            [
+                "Owners e admins escolhem uma das 12 paletas disponíveis em Configurações.",
+                "A prévia mostra 60% de base, 30% de cor principal e 10% de destaque.",
+                "A escolha é aplicada ao painel administrativo e à página pública.",
+                "Tema claro ou escuro é uma preferência individual de cada dispositivo.",
+            ]
+        )
+    )
+    story.append(PageBreak())
+
+    story.extend(title("8. Relatórios", "Indicadores essenciais dos últimos 30 dias."))
     story.append(screenshot("relatorios.png"))
     story.append(Spacer(1, 4 * mm))
     story.extend(
@@ -376,7 +391,7 @@ def build():
     )
     story.append(PageBreak())
 
-    story.extend(title("8. Solução de problemas", "Verificações rápidas antes de acionar o suporte."))
+    story.extend(title("9. Solução de problemas", "Verificações rápidas antes de acionar o suporte."))
     help_rows = [
         ["Não consigo entrar", "Redefina a senha e confirme o e-mail."],
         ["Não há horários", "Revise expediente, equipe, bloqueios e antecedência."],

@@ -4,6 +4,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/booking/booking-flow";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   getPublicServices,
   getPublicStaff,
@@ -96,25 +97,28 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
       />
       <header className="overflow-hidden bg-[var(--booking-surface)]">
         <div
-          className={`mx-auto flex max-w-4xl flex-col px-5 pb-12 pt-16 sm:px-8 sm:pb-16 sm:pt-24 ${
+          className={`mx-auto flex max-w-5xl flex-col px-5 pb-14 pt-16 sm:px-8 sm:pb-20 sm:pt-24 ${
             tenant.theme.headerAlignment === "center" ? "items-center text-center" : "items-start"
           }`}
         >
-          <div className="flex items-center gap-3">
-            {tenant.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured.
-              <img alt={`Logo ${tenant.name}`} className="size-10 rounded-xl border border-[var(--booking-border)] bg-white object-cover" src={tenant.logoUrl} />
-            ) : (
-              <span className="grid size-10 place-items-center rounded-xl bg-[var(--booking-primary)] text-sm font-bold text-white">
-                {tenant.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            <p className="text-sm font-medium opacity-60">Agendamento online</p>
+          <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {tenant.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured.
+                <img alt={`Logo ${tenant.name}`} className="size-10 rounded-xl border border-[var(--booking-border)] bg-white object-cover" src={tenant.logoUrl} />
+              ) : (
+                <span className="grid size-10 place-items-center rounded-xl bg-[var(--booking-primary)] text-sm font-bold text-white">
+                  {tenant.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <p className="text-sm font-medium opacity-60">Agendamento online</p>
+            </div>
+            <ThemeToggle className="border-[var(--booking-border)] bg-[var(--booking-hover)] text-inherit shadow-none" compact />
           </div>
 
-          <div className="mt-12 max-w-3xl sm:mt-16">
-            <p className="text-sm font-semibold text-[var(--booking-accent)]">Reserve seu horário</p>
-            <h1 className="mt-4 text-5xl font-semibold leading-[0.98] tracking-[-0.06em] sm:text-7xl lg:text-8xl">{tenant.name}</h1>
+          <div className="mt-14 max-w-4xl sm:mt-20">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--booking-accent)]">Reserve seu horário</p>
+            <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-[-0.065em] sm:text-7xl lg:text-[6.5rem]">{tenant.name}</h1>
             {tenant.description ? <p className="mt-6 max-w-2xl text-lg leading-8 opacity-65">{tenant.description}</p> : null}
           </div>
 
@@ -126,9 +130,9 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
         </div>
         {tenant.coverUrl ? (
           <div className="mx-auto max-w-6xl px-5 pb-6 sm:px-8 sm:pb-8">
-            <div className="overflow-hidden rounded-[2rem] bg-[var(--booking-hover)]">
+            <div className="overflow-hidden rounded-[2.25rem] bg-[var(--booking-hover)] shadow-[0_22px_70px_rgb(0_0_0/10%)]">
               {/* eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured. */}
-              <img alt="" className="h-56 w-full object-cover sm:h-80" src={tenant.coverUrl} />
+              <img alt="" className="h-64 w-full object-cover sm:h-[26rem]" src={tenant.coverUrl} />
             </div>
           </div>
         ) : (

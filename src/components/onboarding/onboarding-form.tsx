@@ -41,8 +41,8 @@ export function OnboardingForm() {
   const displayedSlug = slugEdited ? slug : normalizeSlug(name);
 
   return (
-    <form action={action} className="grid gap-8" noValidate>
-      <section className="surface p-5 sm:p-7" aria-labelledby="business-title">
+    <form action={action} className="grid gap-6" noValidate>
+      <section className="surface p-6 sm:p-8" aria-labelledby="business-title">
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700">
             <Building2 aria-hidden="true" size={21} />
@@ -59,7 +59,7 @@ export function OnboardingForm() {
               className={cn(
                 "rounded-2xl border p-4 text-left transition",
                 segment === item.value
-                  ? "border-zinc-950 bg-zinc-950 text-white"
+                  ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
                   : "border-zinc-200 bg-white hover:border-zinc-400",
               )}
               key={item.value}
@@ -89,7 +89,7 @@ export function OnboardingForm() {
         </div>
       </section>
 
-      <section className="surface p-5 sm:p-7" aria-labelledby="location-title">
+      <section className="surface p-6 sm:p-8" aria-labelledby="location-title">
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700"><MapPin aria-hidden="true" size={21} /></span>
           <div><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Etapa 2 de 4</p><h2 className="mt-1 text-xl font-bold" id="location-title">Local e horários</h2></div>
@@ -107,7 +107,7 @@ export function OnboardingForm() {
         <p className="mt-4 inline-flex items-center gap-2 text-xs text-zinc-500"><Clock3 aria-hidden="true" size={15} /> Segunda a sábado. Ajuste intervalos e exceções depois.</p>
       </section>
 
-      <section className="surface p-5 sm:p-7" aria-labelledby="team-title">
+      <section className="surface p-6 sm:p-8" aria-labelledby="team-title">
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700"><UserRound aria-hidden="true" size={21} /></span>
           <div><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Etapa 3 de 4</p><h2 className="mt-1 text-xl font-bold" id="team-title">Primeiro profissional</h2></div>
@@ -116,7 +116,7 @@ export function OnboardingForm() {
         <p className="mt-5 inline-flex items-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600"><Sparkles aria-hidden="true" size={17} /> Serviços do segmento serão criados como dados editáveis.</p>
       </section>
 
-      <section className="surface p-5 sm:p-7" aria-labelledby="theme-title">
+      <section className="surface p-6 sm:p-8" aria-labelledby="theme-title">
         <div className="flex items-start gap-4">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700"><Palette aria-hidden="true" size={21} /></span>
           <div><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Etapa 4 de 4</p><h2 className="mt-1 text-xl font-bold" id="theme-title">Identidade visual</h2></div>

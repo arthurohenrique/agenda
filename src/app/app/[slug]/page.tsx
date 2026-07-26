@@ -50,12 +50,12 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
         : format(date, "MMMM 'de' yyyy", { locale: ptBR });
 
   return (
-    <main className="px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-      <div className="mx-auto max-w-7xl">
-        <header className="flex flex-wrap items-center justify-between gap-4">
+    <main className="page-shell">
+      <div className="page-container">
+        <header className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-sm font-semibold text-zinc-500">Agenda</p>
-            <h1 className="mt-1 text-xl font-bold capitalize tracking-[-0.025em] sm:text-2xl">{periodLabel}</h1>
+            <p className="page-eyebrow">Agenda</p>
+            <h1 className="page-title capitalize">{periodLabel}</h1>
           </div>
           <div className="flex items-center gap-2">
             {canOperate ? (
@@ -83,7 +83,7 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
           </div>
         </header>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-zinc-200 py-3">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-y border-zinc-200 py-4">
           <div className="flex items-center gap-1" aria-label="Navegação de período">
             <Link className="grid size-10 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${previousDate}&view=${view}`} aria-label="Período anterior">
               <ChevronLeft aria-hidden="true" size={20} />

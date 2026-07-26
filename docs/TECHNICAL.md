@@ -31,11 +31,17 @@ flowchart LR
 Server Components são o padrão. Componentes cliente são usados em formulários,
 Realtime e fluxos com estado local.
 
-A interface acompanha automaticamente `prefers-color-scheme` do sistema operacional.
-No modo escuro, o canvas usa preto verdadeiro (`#000000`), superfícies elevadas usam
-pretos neutros e os estados semânticos mantêm contraste próprio. A página pública
-preserva as cores de marca do tenant, mas adapta fundo, superfície, texto e bordas ao
-tema escuro do dispositivo.
+A interface usa `prefers-color-scheme` na primeira visita e permite alternar
+manualmente entre tema claro e escuro. A preferência fica somente no `localStorage`
+do dispositivo. No modo escuro, o canvas usa preto verdadeiro (`#000000`), superfícies
+elevadas usam pretos neutros e os estados semânticos mantêm contraste próprio. A
+página pública preserva as cores de marca do tenant, mas adapta fundo, superfície,
+texto e bordas ao tema escolhido.
+
+Owners e admins escolhem, em Configurações, uma das 12 paletas acessíveis de 60–30–10. A
+seleção grava os cinco tokens existentes em `theme_settings`; o shell administrativo
+e a página pública consomem os mesmos tokens. O formulário só aceita IDs de paletas
+pré-definidas no servidor, com checagem de papel e escopo do tenant.
 
 ## 3. Configuração
 

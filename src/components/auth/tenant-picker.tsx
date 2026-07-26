@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Building2, LogOut } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { Brand } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { AuthenticatedUser } from "@/lib/auth/session";
 import type { TenantSummary } from "@/types/domain";
 
@@ -13,30 +14,33 @@ export function TenantPicker({
   user: AuthenticatedUser;
 }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-5 py-8 sm:px-8 sm:py-12">
+    <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex items-center justify-between gap-5">
         <Brand />
-        <form action={logoutAction}>
-          <button className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-zinc-600 hover:bg-white hover:text-zinc-950">
-            <LogOut aria-hidden="true" size={17} />
-            Sair
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          <ThemeToggle compact />
+          <form action={logoutAction}>
+            <button className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-zinc-600 hover:bg-white hover:text-zinc-950">
+              <LogOut aria-hidden="true" size={17} />
+              Sair
+            </button>
+          </form>
+        </div>
       </header>
-      <section className="my-auto py-16">
-        <p className="mb-3 text-sm font-semibold text-zinc-500">{user.email}</p>
-        <h1 className="max-w-xl text-4xl font-bold tracking-[-0.04em] text-zinc-950 sm:text-5xl">
+      <section className="my-auto py-20">
+        <p className="page-eyebrow mb-4">{user.email}</p>
+        <h1 className="max-w-2xl text-5xl font-semibold leading-[1.02] tracking-[-0.055em] text-zinc-950 sm:text-6xl">
           Onde você quer trabalhar hoje?
         </h1>
-        <p className="mt-4 max-w-lg text-base leading-7 text-zinc-600">
+        <p className="mt-6 max-w-lg text-base leading-7 text-zinc-600">
           Escolha um estabelecimento. Cada ambiente mantém dados e permissões separados.
         </p>
 
-        <div className="mt-10 grid gap-3">
+        <div className="mt-12 grid gap-3">
           {memberships.length ? (
             memberships.map((membership) => (
               <Link
-                className="group flex min-h-20 items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-md"
+                className="premium-card premium-card-interactive group flex min-h-24 items-center gap-4 p-5 transition"
                 href={`/app/${membership.slug}`}
                 key={membership.id}
               >

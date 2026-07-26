@@ -7,10 +7,10 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  primary: "bg-zinc-950 text-white hover:bg-zinc-800 disabled:bg-zinc-400",
-  secondary: "border border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50",
+  primary: "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:bg-zinc-400",
+  secondary: "border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:-translate-y-0.5 hover:border-[var(--accent)] hover:bg-[var(--surface-soft)]",
   danger: "bg-red-700 text-white hover:bg-red-800",
-  ghost: "bg-transparent text-zinc-700 hover:bg-zinc-100",
+  ghost: "bg-transparent text-zinc-700 hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]",
 } as const;
 
 const sizes = {
@@ -29,11 +29,12 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-70",
         variants[variant],
         sizes[size],
         className,
       )}
+      tabIndex={0}
       type={type}
       {...props}
     />

@@ -17,7 +17,18 @@ reservas públicas. Construído com Next.js, TypeScript e Supabase.
 - Cancelamento e reagendamento por token seguro.
 - Relatórios operacionais dos últimos 30 dias.
 - Publicação condicionada a checklist e contraste WCAG AA.
+- Paletas 60-30-10 pré-definidas por estabelecimento, refletidas no painel e na reserva pública.
+- Tema claro/escuro por dispositivo, preservando a identidade de cada estabelecimento.
 - RLS forçada, rate limit persistente e prevenção de sobreposição com GiST.
+
+## Identidade visual por estabelecimento
+
+![Paletas 60-30-10](docs/images/paletas.png)
+
+Owners e admins escolhem entre 12 paletas acessíveis em **Configurações**. Cada
+paleta aplica 60% de base, 30% de cor principal e 10% de destaque no painel
+administrativo e na página pública de agendamento. A prévia funciona também no
+Safari, sem depender de recursos CSS recentes.
 
 ## Experiência do cliente
 

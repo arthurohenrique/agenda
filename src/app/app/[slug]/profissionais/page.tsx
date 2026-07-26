@@ -12,16 +12,16 @@ export default async function StaffPage({ params }: StaffPageProps) {
   const canManage = tenant.role === "owner" || tenant.role === "admin";
 
   return (
-    <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-6xl">
-        <p className="text-sm font-semibold text-zinc-500">Equipe</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Profissionais</h1>
-        <p className="mt-2 text-sm text-zinc-500">Serviços, visibilidade e acesso à agenda.</p>
+    <main className="page-shell">
+      <div className="page-container max-w-6xl">
+        <p className="page-eyebrow">Equipe</p>
+        <h1 className="page-title">Profissionais</h1>
+        <p className="page-description">Serviços, visibilidade e acesso à agenda.</p>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <section className="grid content-start gap-3">
             {staff.map((person) => (
-              <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm" key={person.id}>
+              <article className="premium-card premium-card-interactive p-6 transition" key={person.id}>
                 <div className="flex items-start gap-4">
                   <span className="grid size-12 shrink-0 place-items-center rounded-full text-white" style={{ backgroundColor: person.color }}><UserRound aria-hidden="true" size={20} /></span>
                   <div className="min-w-0 flex-1">
@@ -36,7 +36,7 @@ export default async function StaffPage({ params }: StaffPageProps) {
           </section>
 
           {canManage ? (
-            <aside className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
+            <aside className="premium-card p-6 xl:sticky xl:top-24 xl:self-start">
               <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-zinc-100"><Plus aria-hidden="true" size={19} /></span><div><p className="text-xs font-semibold text-zinc-500">CADASTRO RÁPIDO</p><h2 className="font-bold">Novo profissional</h2></div></div>
               <form action={createStaffAction} className="mt-5 grid gap-4">
                 <input name="slug" type="hidden" value={slug} />

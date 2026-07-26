@@ -4,6 +4,7 @@ import { CalendarDays, Clock3, MapPin, UserRound } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { notFound } from "next/navigation";
 import { ManageBookingActions } from "@/components/booking/manage-booking-actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getManagedBooking } from "@/features/booking/manage";
 import { formatDateInTimezone, formatTimeInTimezone } from "@/lib/dates";
 import type { AppointmentStatus } from "@/types/domain";
@@ -38,15 +39,18 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
   if (!booking || booking.tenantSlug !== slug) notFound();
 
   return (
-    <main className="min-h-dvh bg-[var(--background)] px-5 py-10 sm:py-16">
+    <main className="min-h-dvh bg-[var(--background)] px-5 py-12 sm:py-20">
       <div className="mx-auto max-w-2xl">
-        <Link className="text-sm font-bold text-zinc-600 hover:text-zinc-950" href={`/${slug}`}>
-          ← {booking.tenantName}
-        </Link>
-        <section className="surface mt-5 p-6 sm:p-9">
-          <p className="text-sm font-semibold text-blue-700">{statusLabels[booking.status]}</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Seu agendamento</h1>
-          <p className="mt-3 text-zinc-600">Consulte os detalhes ou altere sua reserva com segurança.</p>
+        <div className="flex items-center justify-between gap-4">
+          <Link className="text-sm font-bold text-zinc-600 hover:text-zinc-950" href={`/${slug}`}>
+            ← {booking.tenantName}
+          </Link>
+          <ThemeToggle compact />
+        </div>
+        <section className="surface mt-6 p-6 sm:p-10">
+          <p className="page-eyebrow">{statusLabels[booking.status]}</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em]">Seu agendamento</h1>
+          <p className="mt-4 leading-7 text-zinc-600">Consulte os detalhes ou altere sua reserva com segurança.</p>
 
           <dl className="my-8 grid gap-5 border-y border-zinc-100 py-7 sm:grid-cols-2">
             <div className="flex gap-3">

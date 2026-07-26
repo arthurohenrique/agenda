@@ -15,18 +15,18 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
   const canManage = tenant.role === "owner" || tenant.role === "admin";
 
   return (
-    <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-6xl">
+    <main className="page-shell">
+      <div className="page-container max-w-6xl">
         <div>
-          <p className="text-sm font-semibold text-zinc-500">Catálogo</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Serviços</h1>
-          <p className="mt-2 text-sm text-zinc-500">Preço, duração, publicação e profissionais habilitados.</p>
+          <p className="page-eyebrow">Catálogo</p>
+          <h1 className="page-title">Serviços</h1>
+          <p className="page-description">Preço, duração, publicação e profissionais habilitados.</p>
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="grid content-start gap-3" aria-label="Serviços cadastrados">
             {services.map((service) => (
-              <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm" key={service.id}>
+              <article className="premium-card premium-card-interactive p-6 transition" key={service.id}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -66,7 +66,7 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
           </section>
 
           {canManage ? (
-            <aside className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm xl:sticky xl:top-24 xl:self-start">
+            <aside className="premium-card p-6 xl:sticky xl:top-24 xl:self-start">
               <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-zinc-100"><Plus aria-hidden="true" size={19} /></span><div><p className="text-xs font-semibold text-zinc-500">CADASTRO RÁPIDO</p><h2 className="font-bold">Novo serviço</h2></div></div>
               <form action={createServiceAction} className="mt-5 grid gap-4">
                 <input name="slug" type="hidden" value={slug} />

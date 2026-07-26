@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Brand } from "@/components/brand";
 import { UpdatePasswordForm } from "@/components/auth/update-password-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -15,10 +16,10 @@ export default async function UpdatePasswordPage() {
   return (
     <main className="grid min-h-dvh place-items-center px-5 py-12">
       <div className="w-full max-w-md">
-        <Brand />
-        <section className="surface mt-8 p-6 sm:p-8">
-          <p className="text-sm font-semibold text-zinc-500">Recuperação de acesso</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Crie uma nova senha</h1>
+        <div className="flex items-center justify-between"><Brand /><ThemeToggle compact /></div>
+        <section className="surface mt-10 p-6 sm:p-9">
+          <p className="page-eyebrow">Recuperação de acesso</p>
+          <h1 className="mt-3 text-4xl font-semibold leading-tight tracking-[-0.05em]">Crie uma nova senha</h1>
           <p className="mb-7 mt-3 text-sm leading-6 text-zinc-600">Use uma senha exclusiva. Sessões anteriores serão protegidas pela rotação do Supabase Auth.</p>
           <UpdatePasswordForm />
         </section>

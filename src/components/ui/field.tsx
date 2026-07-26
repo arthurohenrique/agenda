@@ -19,11 +19,12 @@ export function Field({ label, error, hint, id, className, ...props }: FieldProp
         aria-describedby={errorId ?? hintId}
         aria-invalid={Boolean(error)}
         className={cn(
-          "min-h-12 w-full rounded-xl border border-zinc-200 bg-white px-4 text-base text-zinc-950 shadow-sm transition placeholder:text-zinc-400 hover:border-zinc-300 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10",
+          "form-control text-base placeholder:text-zinc-400",
           error && "border-red-500 focus:border-red-600 focus:ring-red-600/10",
           className,
         )}
         id={inputId}
+        suppressHydrationWarning
         {...props}
       />
       {hint ? (

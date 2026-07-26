@@ -96,7 +96,7 @@ export function LoginForm() {
       ) : null}
       <SubmitButton label="Entrar" />
       <button
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950"
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-semibold text-zinc-600 hover:bg-[var(--surface-soft)] hover:text-zinc-950"
         onClick={() => setShowRecovery(true)}
         type="button"
       >
