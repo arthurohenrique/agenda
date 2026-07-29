@@ -109,6 +109,9 @@ NOTIFICATION_WORKER_SECRET=<32-ou-mais-caracteres>
 NOTIFICATION_MODE=dry-run
 ```
 
+`dry-run` é exclusivo do desenvolvimento local. Em produção, configure o modo
+`webhook`, a URL e o segredo do provedor.
+
 Nunca exponha `sb_secret`, `service_role` ou peppers em variáveis `NEXT_PUBLIC_*`.
 
 ## Dados demonstrativos

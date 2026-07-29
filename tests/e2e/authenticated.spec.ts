@@ -9,6 +9,10 @@ async function login(page: import("@playwright/test").Page, email: string) {
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
+async function expectFocusInside(dialog: import("@playwright/test").Locator) {
+  expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+}
+
 test.describe("autenticação com banco local", () => {
   test.skip(!databaseEnabled, "Requer Supabase local com seed.");
 
@@ -46,5 +50,54 @@ test.describe("autenticação com banco local", () => {
     await expect(page).toHaveURL(/\/app\/barbearia-central/);
     await page.goto("/app/salao-da-ana");
     await expect(page.getByRole("heading", { name: "Agenda não encontrada" })).toBeVisible();
+  });
+
+  test("menu móvel e novo agendamento gerenciam foco em 320 px", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await login(page, "dono.barbearia@agenda.local");
+    await expect(page).toHaveURL(/\/app\/barbearia-central/);
+
+    const menuTrigger = page.getByRole("button", { name: "Abrir menu" });
+    await expect(menuTrigger).not.toHaveAttribute("aria-controls");
+    await menuTrigger.click();
+
+    const menuDialog = page.getByRole("dialog", { name: "Menu" });
+    const closeMenu = menuDialog.getByRole("button", { name: "Fechar menu" });
+    await expect(closeMenu).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expectFocusInside(menuDialog);
+    await page.keyboard.press("Tab");
+    await expect(closeMenu).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(menuDialog).toBeHidden();
+    await expect(menuTrigger).toBeFocused();
+    await expect(menuTrigger).not.toHaveAttribute("aria-controls");
+
+    const blockTrigger = page.getByRole("button", { name: "Disponibilidade" });
+    await blockTrigger.click();
+
+    const blockDialog = page.getByRole("dialog", { name: "Folga e fechamento" });
+    const closeBlock = blockDialog.getByRole("button", { name: "Fechar disponibilidade" });
+    await expect(closeBlock).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expectFocusInside(blockDialog);
+    await page.keyboard.press("Escape");
+    await expect(blockDialog).toBeHidden();
+    await expect(blockTrigger).toBeFocused();
+
+    const bookingTrigger = page.getByRole("button", { name: "Novo agendamento", exact: true });
+    await expect(bookingTrigger).not.toHaveAttribute("aria-controls");
+    await bookingTrigger.click();
+
+    const bookingDialog = page.getByRole("dialog", { name: "Novo agendamento" });
+    const closeBooking = bookingDialog.getByRole("button", { name: "Fechar" });
+    await expect(closeBooking).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expectFocusInside(bookingDialog);
+    await page.keyboard.press("Tab");
+    await expect(closeBooking).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(bookingDialog).toBeHidden();
+    await expect(bookingTrigger).toBeFocused();
   });
 });

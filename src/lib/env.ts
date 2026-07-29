@@ -21,6 +21,22 @@ const serverEnvSchema = publicEnvSchema.extend({
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
+function serverEnvValues() {
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    BOOKING_TOKEN_PEPPER: process.env.BOOKING_TOKEN_PEPPER,
+    TRUSTED_CLIENT_IP_HEADER: process.env.TRUSTED_CLIENT_IP_HEADER,
+    NOTIFICATION_WORKER_SECRET: process.env.NOTIFICATION_WORKER_SECRET,
+    NOTIFICATION_MODE: process.env.NOTIFICATION_MODE,
+    NOTIFICATION_WEBHOOK_URL: process.env.NOTIFICATION_WEBHOOK_URL,
+    NOTIFICATION_WEBHOOK_SECRET: process.env.NOTIFICATION_WEBHOOK_SECRET,
+  };
+}
+
 export function isSupabaseConfigured(): boolean {
   return publicEnvSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -40,19 +56,7 @@ export function getPublicEnv(): PublicEnv {
 }
 
 export function getServerEnv(): ServerEnv {
-  return serverEnvSchema.parse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    BOOKING_TOKEN_PEPPER: process.env.BOOKING_TOKEN_PEPPER,
-    TRUSTED_CLIENT_IP_HEADER: process.env.TRUSTED_CLIENT_IP_HEADER,
-    NOTIFICATION_WORKER_SECRET: process.env.NOTIFICATION_WORKER_SECRET,
-    NOTIFICATION_MODE: process.env.NOTIFICATION_MODE,
-    NOTIFICATION_WEBHOOK_URL: process.env.NOTIFICATION_WEBHOOK_URL,
-    NOTIFICATION_WEBHOOK_SECRET: process.env.NOTIFICATION_WEBHOOK_SECRET,
-  });
+  return serverEnvSchema.parse(serverEnvValues());
 }
 
 export function getBookingTokenPepper(): string {
@@ -67,17 +71,24 @@ export function getBookingTokenPepper(): string {
 export function isRuntimeReady(): boolean {
   if (!isSupabaseConfigured()) return false;
   if (process.env.NODE_ENV !== "production") return true;
-  return Boolean(serverEnvSchema.safeParse({
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    BOOKING_TOKEN_PEPPER: process.env.BOOKING_TOKEN_PEPPER,
-    TRUSTED_CLIENT_IP_HEADER: process.env.TRUSTED_CLIENT_IP_HEADER,
-    NOTIFICATION_WORKER_SECRET: process.env.NOTIFICATION_WORKER_SECRET,
-    NOTIFICATION_MODE: process.env.NOTIFICATION_MODE,
-    NOTIFICATION_WEBHOOK_URL: process.env.NOTIFICATION_WEBHOOK_URL,
-    NOTIFICATION_WEBHOOK_SECRET: process.env.NOTIFICATION_WEBHOOK_SECRET,
-  }).data?.BOOKING_TOKEN_PEPPER);
+  const parsed = serverEnvSchema.safeParse(serverEnvValues());
+  if (!parsed.success || !parsed.data.BOOKING_TOKEN_PEPPER) return false;
+
+  const env = parsed.data;
+  const notificationConfigured = Boolean(
+    env.SUPABASE_SERVICE_ROLE_KEY ||
+      env.NOTIFICATION_WORKER_SECRET ||
+      env.NOTIFICATION_MODE ||
+      env.NOTIFICATION_WEBHOOK_URL ||
+      env.NOTIFICATION_WEBHOOK_SECRET,
+  );
+  if (!notificationConfigured) return true;
+
+  return Boolean(
+    env.SUPABASE_SERVICE_ROLE_KEY &&
+      env.NOTIFICATION_WORKER_SECRET &&
+      env.NOTIFICATION_MODE === "webhook" &&
+      env.NOTIFICATION_WEBHOOK_URL &&
+      env.NOTIFICATION_WEBHOOK_SECRET,
+  );
 }

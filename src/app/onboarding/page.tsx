@@ -15,13 +15,13 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingPage() {
   await requireUser();
   return (
-    <main className="min-h-dvh bg-[var(--background)] px-5 py-8 sm:px-8 sm:py-12 lg:py-16">
+    <main className="min-h-dvh bg-[var(--background)] px-5 py-8 sm:px-8 sm:py-12 lg:py-16" id="main-content" tabIndex={-1}>
       <div className="mx-auto max-w-6xl">
-        <header className="flex items-center justify-between gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <Brand />
           <div className="flex items-center gap-2">
             <ThemeToggle compact />
-            <Link className="rounded-xl px-3 py-2 text-sm font-bold text-zinc-600 hover:bg-white hover:text-zinc-950" href="/">Sair do onboarding</Link>
+            <Link className="inline-flex min-h-11 items-center rounded-xl px-3 py-2 text-sm font-bold text-zinc-600 hover:bg-white hover:text-zinc-950" href="/">Sair do onboarding</Link>
           </div>
         </header>
         <div className="mb-12 mt-20 max-w-3xl">

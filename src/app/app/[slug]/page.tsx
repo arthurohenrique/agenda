@@ -50,62 +50,65 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
         : format(date, "MMMM 'de' yyyy", { locale: ptBR });
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content" tabIndex={-1}>
       <div className="page-container">
         <header className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="page-eyebrow">Agenda</p>
             <h1 className="page-title capitalize">{periodLabel}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {canOperate ? (
-              <>
-                <QuickBooking
-                  initialDate={selectedDate}
-                  locationId={locationId}
-                  services={services}
-                  slug={slug}
-                  staff={staff}
-                  timezone={tenant.timezone}
-                />
-                <QuickBooking
-                  initialDate={selectedDate}
-                  locationId={locationId}
-                  mode="walk_in"
-                  services={services}
-                  slug={slug}
-                  staff={staff}
-                  timezone={tenant.timezone}
-                />
-                <QuickBlock blocks={blocks} date={selectedDate} locationId={locationId} slug={slug} staff={staff} timezone={tenant.timezone} />
-              </>
-            ) : null}
-          </div>
+          {canOperate ? (
+            <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:[&>button]:w-auto [&>button]:w-full">
+              <QuickBooking
+                initialDate={selectedDate}
+                locationId={locationId}
+                services={services}
+                slug={slug}
+                staff={staff}
+                timezone={tenant.timezone}
+              />
+              <QuickBooking
+                initialDate={selectedDate}
+                locationId={locationId}
+                mode="walk_in"
+                services={services}
+                slug={slug}
+                staff={staff}
+                timezone={tenant.timezone}
+              />
+              <QuickBlock blocks={blocks} date={selectedDate} locationId={locationId} slug={slug} staff={staff} timezone={tenant.timezone} />
+            </div>
+          ) : null}
         </header>
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-y border-zinc-200 py-4">
-          <div className="flex items-center gap-1" aria-label="Navegação de período">
-            <Link className="grid size-10 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${previousDate}&view=${view}`} aria-label="Período anterior">
+          <nav className="flex items-center gap-1" aria-label="Navegação de período">
+            <Link className="grid size-11 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${previousDate}&view=${view}`} aria-label="Período anterior">
               <ChevronLeft aria-hidden="true" size={20} />
             </Link>
-            <Link className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold hover:bg-zinc-100" href={`/app/${slug}?date=${today}&view=${view}`}>
+            <Link
+              aria-current={selectedDate === today ? "date" : undefined}
+              className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-bold hover:bg-zinc-100"
+              href={`/app/${slug}?date=${today}&view=${view}`}
+            >
               Hoje
             </Link>
-            <Link className="grid size-10 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${nextDate}&view=${view}`} aria-label="Próximo período">
+            <Link className="grid size-11 place-items-center rounded-xl text-zinc-600 hover:bg-zinc-100" href={`/app/${slug}?date=${nextDate}&view=${view}`} aria-label="Próximo período">
               <ChevronRight aria-hidden="true" size={20} />
             </Link>
-          </div>
-          <div className="grid grid-cols-3 rounded-xl bg-zinc-100 p-1 text-sm font-semibold" aria-label="Modo de visualização">
+          </nav>
+          <nav className="grid grid-cols-3 rounded-xl bg-zinc-100 p-1 text-sm font-semibold" aria-label="Modo de visualização">
             {(["day", "week", "month"] as const).map((item) => (
               <Link
-                className={`rounded-lg px-4 py-2 text-center ${view === item ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-950"}`}
+                aria-current={view === item ? "page" : undefined}
+                className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-center ${view === item ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-950"}`}
                 href={`/app/${slug}?date=${selectedDate}&view=${item}`}
                 key={item}
               >
                 {item === "day" ? "Dia" : item === "week" ? "Semana" : "Mês"}
               </Link>
             ))}
-          </div>
+          </nav>
         </div>
 
         <section className="mt-4" aria-label="Agenda">

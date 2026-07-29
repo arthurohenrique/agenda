@@ -66,6 +66,9 @@ NOTIFICATION_WEBHOOK_URL=https://provider.example/events
 NOTIFICATION_WEBHOOK_SECRET=provider-secret
 ```
 
+O modo `dry-run` é exclusivo do ambiente local. Produção exige `webhook`, URL e
+segredo do provedor. A URL do webhook deve usar HTTPS, sem credenciais embutidas.
+
 `NEXT_PUBLIC_*` entra no bundle. `SUPABASE_SERVICE_ROLE_KEY`, peppers e segredos de
 worker/provedor nunca podem ser expostos ao navegador. Em produção, o pepper é
 obrigatório. Header de IP só deve ser configurado quando o proxy remover valores
@@ -171,7 +174,11 @@ sequenceDiagram
 
 - A transação grava `outbox_events`.
 - `POST /api/internal/notifications` exige bearer secret.
-- O worker reclama eventos com lease, envia em modo `dry-run` ou webhook e conclui.
+- O worker valida o provedor antes de reclamar eventos da outbox.
+- O worker reclama eventos com lease, usa `dry-run` apenas local ou webhook e conclui.
+- O webhook recebe `Idempotency-Key` com o ID do evento para deduplicar retries.
+- Rejeições permanentes geram `error` na primeira ocorrência; erros transitórios
+  usam `warn` nos marcos de retry.
 - Falha aplica backoff; depois de oito tentativas o evento exige intervenção.
 
 ### LGPD
@@ -236,7 +243,12 @@ segunda parte.
 ## 12. Observabilidade e incidentes
 
 - Logs do servidor são JSON estruturado e não devem receber PII.
-- `/api/health` informa apenas estado e versão.
+- O log de requisições recebidas pelo `next dev` ignora caminhos conhecidos com
+  token, disponibilidade e health checks repetitivos. O log automático de
+  argumentos de Server Functions está desativado. Isso não redige logs próprios da
+  aplicação, navegador, proxy ou hospedagem; cada destino exige regra equivalente.
+- `/api/health` informa apenas estado e versão. Em produção, uma configuração
+  parcial do worker de notificações deixa o estado `degraded`.
 - Verifique logs do Next.js e do Supabase.
 - Para falha de login, confirme URL, chave, usuário e redirect URLs.
 - Para `PGRST201`, explicite a foreign key no relacionamento embutido.

@@ -82,10 +82,17 @@ notificação porque não possuíam fluxo ativo.
 
 1. Reserva/status grava evento na mesma transação.
 2. Worker chama `claim_outbox_events`; linhas recebem lease de cinco minutos.
-3. Provedor `dry-run` ou webhook recebe payload normalizado.
+3. Provedor `dry-run` local ou webhook em produção recebe payload normalizado; o
+   webhook HTTPS usa o ID do evento como chave de idempotência e não segue
+   redirects.
 4. Sucesso marca `processed_at`.
-5. Falha grava código seguro e agenda backoff exponencial.
-6. Oito falhas interrompem consumo automático.
+5. Falha grava código de lista fechada e agenda backoff exponencial.
+6. Tentativas intermediárias selecionadas geram `warn`; a oitava gera `error` e
+   interrompe o consumo automático.
+
+Rejeições permanentes geram `error` já na primeira ocorrência. O backoff continua
+até o limite da outbox; encerramento antecipado exige uma transição terminal própria
+no banco.
 
 Worker não registra nome, telefone ou e-mail. PII existe apenas em memória durante
 a entrega necessária.

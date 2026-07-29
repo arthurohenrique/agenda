@@ -27,7 +27,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   const ready = items.every(([, complete]) => complete);
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content" tabIndex={-1}>
       <div className="page-container max-w-5xl">
         <p className="page-eyebrow">Configurações</p>
         <h1 className="page-title">Página pública</h1>
@@ -35,14 +35,14 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
         <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="premium-card p-7">
-            <div className="flex items-start gap-4"><span className="grid size-12 place-items-center rounded-xl bg-zinc-100"><Globe2 aria-hidden="true" size={22} /></span><div><p className="text-sm font-semibold text-zinc-500">agenda.exemplo.com/{tenant.slug}</p><h2 className="mt-1 text-xl font-bold">{tenant.state === "published" ? "Página publicada" : "Página em rascunho"}</h2></div></div>
+            <div className="flex min-w-0 items-start gap-4"><span className="grid size-12 shrink-0 place-items-center rounded-xl bg-zinc-100"><Globe2 aria-hidden="true" size={22} /></span><div className="min-w-0"><p className="break-words text-sm font-semibold text-zinc-500 [overflow-wrap:anywhere]">agenda.exemplo.com/{tenant.slug}</p><h2 className="mt-1 text-xl font-bold">{tenant.state === "published" ? "Página publicada" : "Página em rascunho"}</h2></div></div>
             <div className="mt-6 grid gap-3">{items.map(([label, complete]) => <div className="flex items-center gap-3 rounded-xl bg-zinc-50 px-4 py-3" key={label}>{complete ? <CheckCircle2 className="text-green-700" aria-hidden="true" size={19} /> : <CircleDashed className="text-amber-700" aria-hidden="true" size={19} />}<span className="text-sm font-semibold">{label}</span><span className="ml-auto text-xs text-zinc-500">{complete ? "Pronto" : "Pendente"}</span></div>)}</div>
           </div>
 
           <aside className="premium-card p-7">
             <h2 className="font-bold">Visibilidade</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-500">Somente páginas publicadas aparecem para clientes.</p>
-            {tenant.state === "published" ? <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 text-sm font-bold hover:bg-zinc-50" href={`/${tenant.slug}`} target="_blank">Abrir página <ExternalLink aria-hidden="true" size={16} /></Link> : null}
+            {tenant.state === "published" ? <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 text-sm font-bold hover:bg-zinc-50" href={`/${tenant.slug}`} rel="noopener noreferrer" target="_blank">Abrir página <span className="sr-only">(abre em nova aba)</span><ExternalLink aria-hidden="true" size={16} /></Link> : null}
             <form action={changePublicationAction} className="mt-3">
               <input name="slug" type="hidden" value={slug} />
               <input name="intent" type="hidden" value={tenant.state === "published" ? "unpublish" : "publish"} />

@@ -15,7 +15,7 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
   const canManage = tenant.role === "owner" || tenant.role === "admin";
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content" tabIndex={-1}>
       <div className="page-container max-w-6xl">
         <div>
           <p className="page-eyebrow">Catálogo</p>
@@ -27,8 +27,8 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
           <section className="grid content-start gap-3" aria-label="Serviços cadastrados">
             {services.map((service) => (
               <article className="premium-card premium-card-interactive p-6 transition" key={service.id}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 w-full">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-bold">{service.name}</h2>
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${service.is_active ? "bg-green-50 text-green-700" : "bg-zinc-100 text-zinc-500"}`}>
@@ -45,11 +45,11 @@ export default async function ServicesPage({ params }: ServicesPageProps) {
                     </div>
                   </div>
                   {canManage ? (
-                    <form action={toggleServiceAction}>
+                    <form action={toggleServiceAction} className="w-full sm:w-auto">
                       <input name="slug" type="hidden" value={slug} />
                       <input name="id" type="hidden" value={service.id} />
                       <input name="active" type="hidden" value={String(!service.is_active)} />
-                      <button className="min-h-10 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-600 hover:bg-zinc-50">
+                      <button className="min-h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm font-bold text-zinc-600 hover:bg-zinc-50 sm:w-auto">
                         {service.is_active ? "Desativar" : "Ativar"}
                       </button>
                     </form>

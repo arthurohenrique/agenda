@@ -14,7 +14,7 @@ export function TenantPicker({
   user: AuthenticatedUser;
 }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-5 py-8 sm:px-8 sm:py-12">
+    <main className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-5 py-8 sm:px-8 sm:py-12" id="main-content" tabIndex={-1}>
       <header className="flex items-center justify-between gap-5">
         <Brand />
         <div className="flex items-center gap-2">

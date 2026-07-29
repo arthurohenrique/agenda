@@ -3,7 +3,17 @@ import "server-only";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logger } from "@/lib/observability/logger";
-import { deliverNotification } from "./provider";
+import {
+  NotificationWorkerError,
+  isRetryableNotificationError,
+  notificationErrorCode,
+  notificationFailureLevel,
+  shouldLogNotificationFailure,
+} from "./policy";
+import {
+  assertNotificationProviderConfigured,
+  deliverNotification,
+} from "./provider";
 import type { NotificationMessage } from "./types";
 
 const outboxEventSchema = z.object({
@@ -11,12 +21,8 @@ const outboxEventSchema = z.object({
   tenant_id: z.guid(),
   aggregate_id: z.guid(),
   event_type: z.string(),
+  attempts: z.number().int().min(1).max(8),
 });
-
-function errorCode(error: unknown): string {
-  if (!(error instanceof Error)) return "unknown_error";
-  return error.message.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120) || "unknown_error";
-}
 
 async function loadMessage(
   event: z.infer<typeof outboxEventSchema>,
@@ -30,7 +36,11 @@ async function loadMessage(
     .single();
   if (appointmentError || !appointment) throw new Error("appointment_not_found");
 
-  const [{ data: relation }, { data: tenant }, { data: services }] = await Promise.all([
+  const [
+    { data: relation, error: relationError },
+    { data: tenant, error: tenantError },
+    { data: services, error: servicesError },
+  ] = await Promise.all([
     admin
       .from("customer_tenants")
       .select("customer_id")
@@ -45,7 +55,9 @@ async function loadMessage(
       .eq("tenant_id", event.tenant_id)
       .order("sort_order"),
   ]);
-  if (!relation || !tenant) throw new Error("notification_context_not_found");
+  if (relationError || tenantError || servicesError || !relation || !tenant) {
+    throw new Error("notification_context_not_found");
+  }
 
   const { data: customer, error: customerError } = await admin
     .from("customers")
@@ -73,11 +85,14 @@ async function loadMessage(
 }
 
 export async function processOutbox(limit = 10) {
+  assertNotificationProviderConfigured();
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("claim_outbox_events", { p_limit: limit });
   if (error) throw new Error("outbox_claim_failed");
 
-  const events = z.array(outboxEventSchema).parse(data ?? []);
+  const parsedEvents = z.array(outboxEventSchema).safeParse(data ?? []);
+  if (!parsedEvents.success) throw new Error("outbox_payload_invalid");
+  const events = parsedEvents.data;
   let processed = 0;
   let failed = 0;
 
@@ -85,21 +100,46 @@ export async function processOutbox(limit = 10) {
     try {
       const message = await loadMessage(event);
       await deliverNotification(message);
-      const { error: completeError } = await admin.rpc("complete_outbox_event", {
+      const { data: completed, error: completeError } = await admin.rpc("complete_outbox_event", {
         p_event_id: event.id,
       });
-      if (completeError) throw new Error("outbox_complete_failed");
+      if (completeError || completed !== true) throw new Error("outbox_complete_failed");
       processed += 1;
     } catch (eventError) {
       failed += 1;
-      logger.error("notification_delivery_failed", {
-        eventId: event.id,
-        errorCode: errorCode(eventError),
-      });
-      await admin.rpc("defer_outbox_event", {
+      const errorCode = notificationErrorCode(eventError);
+      const { data: deferred, error: deferError } = await admin.rpc("defer_outbox_event", {
         p_event_id: event.id,
-        p_error_code: errorCode(eventError),
+        p_error_code: errorCode,
       });
+      if (deferError || deferred !== true) {
+        throw new NotificationWorkerError("outbox_defer_failed", event.id, event.attempts);
+      }
+
+      const context = { eventId: event.id, errorCode, attempt: event.attempts };
+      if (
+        errorCode === "outbox_complete_failed" &&
+        shouldLogNotificationFailure(event.attempts)
+      ) {
+        logger.error(
+          event.attempts >= 8
+            ? "notification_completion_abandoned"
+            : "notification_completion_deferred",
+          context,
+        );
+      } else if (shouldLogNotificationFailure(event.attempts)) {
+        if (!isRetryableNotificationError(errorCode)) {
+          if (event.attempts === 1) {
+            logger.error("notification_delivery_rejected", context);
+          } else if (notificationFailureLevel(event.attempts) === "error") {
+            logger.error("notification_delivery_abandoned", context);
+          }
+        } else if (notificationFailureLevel(event.attempts) === "error") {
+          logger.error("notification_delivery_abandoned", context);
+        } else {
+          logger.warn("notification_delivery_deferred", context);
+        }
+      }
     }
   }
 

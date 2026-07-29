@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarSync, Clock3, XCircle } from "lucide-react";
 import { z } from "zod";
@@ -34,11 +34,25 @@ export function ManageBookingActions({
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [availabilityFailed, setAvailabilityFailed] = useState(false);
   const [availabilityVersion, setAvailabilityVersion] = useState(0);
+  const rescheduleHeadingRef = useRef<HTMLHeadingElement>(null);
+  const rescheduleTriggerRef = useRef<HTMLButtonElement>(null);
+  const cancelHeadingRef = useRef<HTMLHeadingElement>(null);
+  const cancelTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (rescheduling) rescheduleHeadingRef.current?.focus();
+  }, [rescheduling]);
+
+  useEffect(() => {
+    if (confirmingCancel) cancelHeadingRef.current?.focus();
+  }, [confirmingCancel]);
 
   useEffect(() => {
     if (!rescheduling) return;
     const controller = new AbortController();
+    let active = true;
     const bounds = localDateBounds(date, timezone);
     const params = new URLSearchParams({ dateFrom: bounds.from, dateTo: bounds.to });
     fetch(`/api/bookings/${token}/availability?${params}`, {
@@ -56,14 +70,23 @@ export function ManageBookingActions({
             staffName: z.string(),
           })),
         }).parse(payload);
+        if (!active) return;
         setSlots(parsed.slots);
       })
       .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === "AbortError") return;
+        if (!active || (reason instanceof DOMException && reason.name === "AbortError")) return;
+        setAvailabilityFailed(true);
+        setSelectedSlot(null);
+        setSlots([]);
         setError("Não foi possível consultar novos horários.");
       })
-      .finally(() => setLoadingSlots(false));
-    return () => controller.abort();
+      .finally(() => {
+        if (active) setLoadingSlots(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [availabilityVersion, date, rescheduling, timezone, token]);
 
   async function cancelBooking() {
@@ -105,6 +128,8 @@ export function ManageBookingActions({
         setSelectedSlot(null);
         setSlots([]);
         setLoadingSlots(true);
+        setAvailabilityFailed(false);
+        setError(null);
         setAvailabilityVersion((value) => value + 1);
       }
       return;
@@ -114,33 +139,47 @@ export function ManageBookingActions({
     router.refresh();
   }
 
+  function closeRescheduling() {
+    setRescheduling(false);
+    window.requestAnimationFrame(() => rescheduleTriggerRef.current?.focus());
+  }
+
+  function closeCancellation() {
+    setConfirmingCancel(false);
+    window.requestAnimationFrame(() => cancelTriggerRef.current?.focus());
+  }
+
   if (rescheduling) {
     return (
-      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5" id="reagendar">
-        <h2 className="font-bold text-blue-950">Escolha novo horário</h2>
+      <section aria-labelledby="reschedule-title" className="rounded-2xl border border-blue-200 bg-blue-50 p-5" id="reagendar">
+        <h2 className="font-bold text-blue-950" id="reschedule-title" ref={rescheduleHeadingRef} tabIndex={-1}>Escolha novo horário</h2>
         <p className="mt-2 text-sm leading-6 text-blue-900/75">
           Horário atual será liberado somente depois da nova reserva ser confirmada.
         </p>
         <label className="mt-4 grid max-w-xs gap-2 text-sm font-semibold text-blue-950">
           Data
           <input
-            className="min-h-11 rounded-xl border border-blue-200 bg-white px-3 text-base text-zinc-950"
+            className="min-h-11 rounded-xl border border-blue-700 bg-white px-3 text-base text-zinc-950"
             min={initialDate}
             onChange={(event) => {
               setDate(event.target.value);
               setSelectedSlot(null);
               setSlots([]);
               setLoadingSlots(true);
+              setAvailabilityFailed(false);
               setError(null);
             }}
             type="date"
             value={date}
           />
         </label>
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-live="polite">
+        <div aria-busy={loadingSlots} className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <span aria-live="polite" className="sr-only" role="status">
+            {loadingSlots ? "Carregando novos horários." : availabilityFailed ? "" : slots.length ? `${slots.length} horários disponíveis.` : "Nenhum horário disponível nesta data."}
+          </span>
           {loadingSlots ? Array.from({ length: 5 }, (_, index) => (
-            <span className="h-11 animate-pulse rounded-xl bg-blue-100" key={index} />
-          )) : slots.length ? slots.map((slot) => (
+            <span aria-hidden="true" className="h-11 animate-pulse rounded-xl bg-blue-100" key={index} />
+          )) : availabilityFailed ? null : slots.length ? slots.map((slot) => (
             <button
               aria-label={`${formatTimeInTimezone(slot.startAt, timezone)} com ${slot.staffName}`}
               aria-pressed={selectedSlot?.startAt === slot.startAt && selectedSlot.staffId === slot.staffId}
@@ -148,7 +187,7 @@ export function ManageBookingActions({
                 "min-h-11 rounded-xl border text-sm font-bold",
                 selectedSlot?.startAt === slot.startAt && selectedSlot.staffId === slot.staffId
                   ? "border-blue-900 bg-blue-900 text-white"
-                  : "border-blue-200 bg-white text-blue-950 hover:border-blue-500",
+                  : "border-blue-700 bg-white text-blue-950 hover:border-blue-900",
               )}
               key={`${slot.startAt}-${slot.staffId}`}
               onClick={() => setSelectedSlot(slot)}
@@ -168,25 +207,25 @@ export function ManageBookingActions({
           <Button disabled={!selectedSlot || pending} onClick={rescheduleBooking}>
             {pending ? "Reagendando…" : "Confirmar novo horário"}
           </Button>
-          <Button disabled={pending} onClick={() => setRescheduling(false)} variant="secondary">
+          <Button disabled={pending} onClick={closeRescheduling} variant="secondary">
             Voltar
           </Button>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (confirmingCancel) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-        <h2 className="font-bold text-red-950">Cancelar este agendamento?</h2>
+      <section aria-labelledby="cancel-title" className="rounded-2xl border border-red-200 bg-red-50 p-5" id="cancel-booking">
+        <h2 className="font-bold text-red-950" id="cancel-title" ref={cancelHeadingRef} tabIndex={-1}>Cancelar este agendamento?</h2>
         <p className="mt-2 text-sm leading-6 text-red-900/75">
           O horário será liberado. Esta ação fica registrada no histórico.
         </p>
         <label className="mt-4 grid gap-2 text-sm font-semibold text-red-950">
           Motivo <span className="font-normal opacity-70">(opcional)</span>
           <textarea
-            className="min-h-24 rounded-xl border border-red-200 bg-white p-3 text-base text-zinc-950"
+            className="min-h-24 rounded-xl border border-red-700 bg-white p-3 text-base text-zinc-950"
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             value={reason}
@@ -197,11 +236,11 @@ export function ManageBookingActions({
           <Button disabled={pending} onClick={cancelBooking} variant="danger">
             {pending ? "Cancelando…" : "Confirmar cancelamento"}
           </Button>
-          <Button disabled={pending} onClick={() => setConfirmingCancel(false)} variant="secondary">
+          <Button disabled={pending} onClick={closeCancellation} variant="secondary">
             Manter horário
           </Button>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -209,19 +248,23 @@ export function ManageBookingActions({
     <div className="grid gap-3 sm:grid-cols-2">
       {canReschedule ? (
         <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 font-semibold text-zinc-950 hover:bg-zinc-50"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--control-border)] bg-white px-5 font-semibold text-zinc-950 hover:bg-zinc-50"
           onClick={() => {
             setRescheduling(true);
             setLoadingSlots(true);
+            setAvailabilityFailed(false);
             setError(null);
+            setSelectedSlot(null);
+            setSlots([]);
           }}
+          ref={rescheduleTriggerRef}
           type="button"
         >
           <CalendarSync aria-hidden="true" size={18} /> Reagendar
         </button>
       ) : null}
       {canCancel ? (
-        <Button onClick={() => setConfirmingCancel(true)} variant="danger">
+        <Button onClick={() => setConfirmingCancel(true)} ref={cancelTriggerRef} variant="danger">
           <XCircle aria-hidden="true" size={18} /> Cancelar
         </Button>
       ) : null}

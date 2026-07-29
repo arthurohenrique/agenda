@@ -73,8 +73,8 @@ export function ThemeToggle({
       aria-label={label}
       aria-pressed={dark}
       className={cn(
-        "inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm font-semibold leading-none text-[var(--foreground)] shadow-sm hover:-translate-y-0.5 hover:bg-[var(--surface-soft)]",
-        compact && "size-10 p-0",
+        "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--control-border)] bg-[var(--surface)] px-3 text-sm font-semibold leading-none text-[var(--foreground)] shadow-sm hover:-translate-y-0.5 hover:bg-[var(--surface-soft)]",
+        compact && "size-11 p-0",
         className,
       )}
       onClick={toggleTheme}

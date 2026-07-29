@@ -22,7 +22,7 @@ export function ThemePalettePicker({ slug, selectedPaletteId }: ThemePalettePick
           const selected = palette.id === selectedPaletteId;
           const optionStyle = {
             backgroundColor: palette.surface,
-            borderColor: selected ? palette.primary : "#DFE3DD",
+            borderColor: selected ? palette.primary : "#858F8A",
             boxShadow: selected ? `0 0 0 3px ${palette.primary}2A` : undefined,
           } as CSSProperties;
 
@@ -39,7 +39,7 @@ export function ThemePalettePicker({ slug, selectedPaletteId }: ThemePalettePick
                 <span className="flex items-start justify-between gap-3">
                   <span>
                     <span className="block text-sm font-bold" style={{ color: palette.text }}>{palette.name}</span>
-                    <span className="mt-1 block text-xs leading-5 opacity-60" style={{ color: palette.text }}>{palette.description}</span>
+                    <span className="mt-1 block text-xs leading-5" style={{ color: palette.text }}>{palette.description}</span>
                   </span>
                   {selected ? <span className="grid size-6 place-items-center rounded-full text-white" style={{ backgroundColor: palette.primary }}><Check aria-hidden="true" size={14} /></span> : null}
                 </span>

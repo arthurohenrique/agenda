@@ -18,7 +18,7 @@ export default async function CustomersPage({ params, searchParams }: CustomersP
     : customers;
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content" tabIndex={-1}>
       <div className="page-container max-w-6xl">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="page-eyebrow">Relacionamento</p><h1 className="page-title">Clientes</h1><p className="page-description">Dados operacionais privados deste estabelecimento.</p></div>

@@ -3,12 +3,36 @@ import { expect, test } from "@playwright/test";
 test("login administrativo é acessível por teclado", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Entre na sua agenda" })).toBeVisible();
+
+  const skipLink = page.getByRole("link", { name: "Pular para o conteúdo" });
+  await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
+  await expect(skipLink).toHaveAttribute("href", "#main-content");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#main-content")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("E-mail")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Senha")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Entrar" })).toBeFocused();
+});
+
+test("login mantém reflow em 320 px e alvo de tema tocável", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/");
+
+  const widths = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+
+  const themeToggle = page.getByRole("button", { name: /Ativar tema (claro|escuro)/ });
+  const target = await themeToggle.boundingBox();
+  expect(target).not.toBeNull();
+  expect(target!.width).toBeGreaterThanOrEqual(44);
+  expect(target!.height).toBeGreaterThanOrEqual(44);
 });
 
 test("recuperação não enumera contas", async ({ page }) => {

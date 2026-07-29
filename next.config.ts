@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
+const sensitiveRequestPaths = [
+  /^\/auth\/callback(?:[/?#]|$)/i,
+  /^\/api\/bookings\/[a-f0-9]{64}(?:[/?#]|$)/i,
+  /^\/[^/?#]+\/reserva\/[a-f0-9]{64}(?:[/?#]|$)/i,
+];
+const noisyDevelopmentPaths = [
+  /^\/api\/(?:public|app\/[a-z0-9]+(?:-[a-z0-9]+)*)\/availability\/?(?:\?.*)?$/i,
+  /^\/api\/health\/?(?:\?.*)?$/i,
+];
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -21,6 +30,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   typedRoutes: true,
+  logging: {
+    browserToTerminal: "error",
+    incomingRequests: {
+      ignore: [
+        ...sensitiveRequestPaths,
+        ...(isProduction ? [] : noisyDevelopmentPaths),
+      ],
+    },
+    serverFunctions: false,
+  },
   turbopack: {
     root: process.cwd(),
   },

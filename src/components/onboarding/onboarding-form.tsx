@@ -60,14 +60,14 @@ export function OnboardingForm() {
                 "rounded-2xl border p-4 text-left transition",
                 segment === item.value
                   ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
-                  : "border-zinc-200 bg-white hover:border-zinc-400",
+                  : "border-[var(--control-border)] bg-white hover:border-[var(--accent)]",
               )}
               key={item.value}
               onClick={() => setSegment(item.value)}
               type="button"
             >
               <span className="block text-sm font-bold">{item.label}</span>
-              <span className={cn("mt-1 block text-xs", segment === item.value ? "text-zinc-300" : "text-zinc-500")}>{item.hint}</span>
+              <span className={cn("mt-1 block text-xs", segment === item.value ? "text-[var(--primary-foreground)]" : "text-zinc-500")}>{item.hint}</span>
             </button>
           ))}
         </div>

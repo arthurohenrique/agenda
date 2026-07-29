@@ -12,7 +12,7 @@ export default async function StaffPage({ params }: StaffPageProps) {
   const canManage = tenant.role === "owner" || tenant.role === "admin";
 
   return (
-    <main className="page-shell">
+    <main className="page-shell" id="main-content" tabIndex={-1}>
       <div className="page-container max-w-6xl">
         <p className="page-eyebrow">Equipe</p>
         <h1 className="page-title">Profissionais</h1>
@@ -22,14 +22,16 @@ export default async function StaffPage({ params }: StaffPageProps) {
           <section className="grid content-start gap-3">
             {staff.map((person) => (
               <article className="premium-card premium-card-interactive p-6 transition" key={person.id}>
-                <div className="flex items-start gap-4">
-                  <span className="grid size-12 shrink-0 place-items-center rounded-full text-white" style={{ backgroundColor: person.color }}><UserRound aria-hidden="true" size={20} /></span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{person.name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${person.is_active ? "bg-green-50 text-green-700" : "bg-zinc-100 text-zinc-500"}`}>{person.is_active ? "Ativo" : "Inativo"}</span></div>
-                    {person.title ? <p className="mt-1 text-sm text-zinc-500">{person.title}</p> : null}
-                    <div className="mt-4 flex flex-wrap gap-2">{person.staff_services.map(({ services: service }) => <span className="rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600" key={service.id}>{service.name}</span>)}</div>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="flex min-w-0 items-start gap-4 sm:flex-1">
+                    <span className="grid size-12 shrink-0 place-items-center rounded-full text-white" style={{ backgroundColor: person.color }}><UserRound aria-hidden="true" size={20} /></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{person.name}</h2><span className={`rounded-full px-2 py-1 text-xs font-semibold ${person.is_active ? "bg-green-50 text-green-700" : "bg-zinc-100 text-zinc-500"}`}>{person.is_active ? "Ativo" : "Inativo"}</span></div>
+                      {person.title ? <p className="mt-1 text-sm text-zinc-500">{person.title}</p> : null}
+                      <div className="mt-4 flex flex-wrap gap-2">{person.staff_services.map(({ services: service }) => <span className="rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-600" key={service.id}>{service.name}</span>)}</div>
+                    </div>
                   </div>
-                  {canManage ? <form action={toggleStaffAction}><input name="slug" type="hidden" value={slug} /><input name="id" type="hidden" value={person.id} /><input name="active" type="hidden" value={String(!person.is_active)} /><button className="min-h-10 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-600 hover:bg-zinc-50">{person.is_active ? "Desativar" : "Ativar"}</button></form> : null}
+                  {canManage ? <form action={toggleStaffAction} className="w-full sm:w-auto"><input name="slug" type="hidden" value={slug} /><input name="id" type="hidden" value={person.id} /><input name="active" type="hidden" value={String(!person.is_active)} /><button className="min-h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm font-bold text-zinc-600 hover:bg-zinc-50 sm:w-auto">{person.is_active ? "Desativar" : "Ativar"}</button></form> : null}
                 </div>
               </article>
             ))}

@@ -66,6 +66,8 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
     "--booking-text": tenant.theme.text,
     "--booking-border": "rgb(0 0 0 / 10%)",
     "--booking-border-strong": "rgb(0 0 0 / 30%)",
+    "--booking-control-border": "rgb(0 0 0 / 46%)",
+    "--booking-control-border-strong": "rgb(0 0 0 / 64%)",
     "--booking-hover": "rgb(0 0 0 / 5%)",
     "--booking-skeleton": "rgb(0 0 0 / 10%)",
     background: tenant.theme.background,
@@ -90,19 +92,19 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
   };
 
   return (
-    <main className="booking-theme min-h-dvh" style={themeStyle}>
+    <main className="booking-theme min-h-dvh" id="main-content" style={themeStyle} tabIndex={-1}>
       <script
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
         type="application/ld+json"
       />
-      <header className="overflow-hidden bg-[var(--booking-surface)]">
+      <header className="bg-[var(--booking-surface)]">
         <div
           className={`mx-auto flex max-w-5xl flex-col px-5 pb-14 pt-16 sm:px-8 sm:pb-20 sm:pt-24 ${
             tenant.theme.headerAlignment === "center" ? "items-center text-center" : "items-start"
           }`}
         >
           <div className="flex w-full items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               {tenant.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- tenant media URLs are runtime-configured.
                 <img alt={`Logo ${tenant.name}`} className="size-10 rounded-xl border border-[var(--booking-border)] bg-white object-cover" src={tenant.logoUrl} />
@@ -111,19 +113,19 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
                   {tenant.name.slice(0, 1).toUpperCase()}
                 </span>
               )}
-              <p className="text-sm font-medium opacity-60">Agendamento online</p>
+              <p className="min-w-0 text-sm font-medium">Agendamento online</p>
             </div>
-            <ThemeToggle className="border-[var(--booking-border)] bg-[var(--booking-hover)] text-inherit shadow-none" compact />
+            <ThemeToggle className="border-[var(--booking-control-border)] bg-[var(--booking-hover)] text-inherit shadow-none" compact />
           </div>
 
           <div className="mt-14 max-w-4xl sm:mt-20">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--booking-accent)]">Reserve seu horário</p>
-            <h1 className="mt-5 text-5xl font-semibold leading-[0.94] tracking-[-0.065em] sm:text-7xl lg:text-[6.5rem]">{tenant.name}</h1>
-            {tenant.description ? <p className="mt-6 max-w-2xl text-lg leading-8 opacity-65">{tenant.description}</p> : null}
+            <h1 className="mt-5 break-words text-5xl font-semibold leading-[0.94] tracking-[-0.065em] [overflow-wrap:anywhere] sm:text-7xl lg:text-[6.5rem]">{tenant.name}</h1>
+            {tenant.description ? <p className="mt-6 max-w-2xl text-lg leading-8 [overflow-wrap:anywhere]">{tenant.description}</p> : null}
           </div>
 
-          <p className="mt-10 inline-flex items-center gap-2 text-sm opacity-60">
-            <MapPin aria-hidden="true" size={16} />
+          <p className="mt-10 inline-flex max-w-full min-w-0 flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]">
+            <MapPin aria-hidden="true" className="shrink-0" size={16} />
             {tenant.location.district ? `${tenant.location.district}, ` : ""}
             {tenant.location.city}
           </p>
@@ -145,7 +147,7 @@ export default async function PublicBookingPage({ params }: PublicPageProps) {
       ) : (
         <section className="mx-auto max-w-xl px-5 py-20 text-center">
           <h2 className="text-2xl font-bold">Agenda em preparação</h2>
-          <p className="mt-3 leading-7 opacity-65">
+          <p className="mt-3 leading-7">
             Este estabelecimento ainda não publicou serviços para agendamento online.
           </p>
         </section>

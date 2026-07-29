@@ -15,6 +15,7 @@ interface ManagePageProps {
 
 export const metadata: Metadata = {
   title: "Gerenciar agendamento",
+  referrer: "no-referrer",
   robots: { index: false, follow: false },
 };
 
@@ -39,10 +40,10 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
   if (!booking || booking.tenantSlug !== slug) notFound();
 
   return (
-    <main className="min-h-dvh bg-[var(--background)] px-5 py-12 sm:py-20">
+    <main className="min-h-dvh bg-[var(--background)] px-5 py-12 sm:py-20" id="main-content" tabIndex={-1}>
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between gap-4">
-          <Link className="text-sm font-bold text-zinc-600 hover:text-zinc-950" href={`/${slug}`}>
+          <Link className="inline-flex min-h-11 min-w-0 items-center break-words text-sm font-bold text-zinc-600 [overflow-wrap:anywhere] hover:text-zinc-950" href={`/${slug}`}>
             ← {booking.tenantName}
           </Link>
           <ThemeToggle compact />
@@ -73,18 +74,18 @@ export default async function ManageBookingPage({ params }: ManagePageProps) {
             </div>
             <div className="flex gap-3">
               <UserRound className="mt-0.5 text-zinc-400" aria-hidden="true" size={19} />
-              <div>
+              <div className="min-w-0">
                 <dt className="text-sm text-zinc-500">Atendimento</dt>
-                <dd className="mt-1 font-bold">{booking.serviceNames.join(" + ")}</dd>
-                {booking.staffName ? <dd className="mt-1 text-sm text-zinc-500">com {booking.staffName}</dd> : null}
+                <dd className="mt-1 font-bold [overflow-wrap:anywhere]">{booking.serviceNames.join(" + ")}</dd>
+                {booking.staffName ? <dd className="mt-1 text-sm text-zinc-500 [overflow-wrap:anywhere]">com {booking.staffName}</dd> : null}
               </div>
             </div>
             <div className="flex gap-3">
               <MapPin className="mt-0.5 text-zinc-400" aria-hidden="true" size={19} />
-              <div>
+              <div className="min-w-0">
                 <dt className="text-sm text-zinc-500">Local</dt>
-                <dd className="mt-1 font-bold">{booking.locationName}</dd>
-                <dd className="mt-1 text-sm leading-5 text-zinc-500">{booking.address}</dd>
+                <dd className="mt-1 font-bold [overflow-wrap:anywhere]">{booking.locationName}</dd>
+                <dd className="mt-1 text-sm leading-5 text-zinc-500 [overflow-wrap:anywhere]">{booking.address}</dd>
               </div>
             </div>
           </dl>

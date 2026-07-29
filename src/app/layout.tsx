@@ -42,7 +42,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
       </head>
-      <body>{children}</body>
+      <body suppressHydrationWarning>
+        <a className="skip-link" href="#main-content">
+          Pular para o conteúdo
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function UpdatePasswordPage() {
   await requireUser();
   return (
-    <main className="grid min-h-dvh place-items-center px-5 py-12">
+    <main className="grid min-h-dvh place-items-center px-5 py-12" id="main-content" tabIndex={-1}>
       <div className="w-full max-w-md">
         <div className="flex items-center justify-between"><Brand /><ThemeToggle compact /></div>
         <section className="surface mt-10 p-6 sm:p-9">

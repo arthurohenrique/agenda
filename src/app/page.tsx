@@ -23,7 +23,7 @@ export default async function HomePage() {
   const configured = isSupabaseConfigured();
 
   return (
-    <main className="grid min-h-dvh bg-[var(--background)] lg:grid-cols-[minmax(0,1.12fr)_minmax(430px,0.88fr)]">
+    <main className="grid min-h-dvh bg-[var(--background)] lg:grid-cols-[minmax(0,1.12fr)_minmax(430px,0.88fr)]" id="main-content" tabIndex={-1}>
       <section className="relative flex min-h-[48vh] flex-col justify-between overflow-hidden bg-[#102b24] p-7 text-white [--primary:#eef7f3] [--primary-foreground:#133d35] [--surface:#102b24] sm:p-12 lg:min-h-dvh lg:p-16 xl:p-20">
         <div aria-hidden="true" className="absolute -right-28 -top-24 size-96 rounded-full border border-white/10" />
         <div aria-hidden="true" className="absolute -right-2 top-32 size-44 rounded-full bg-emerald-300/8 blur-2xl" />
@@ -38,7 +38,7 @@ export default async function HomePage() {
             Atendimentos, clientes e equipe organizados para o dia fluir melhor.
           </p>
         </div>
-        <p className="relative hidden text-xs font-medium tracking-wide text-white/35 lg:block">Agenda · Ambiente administrativo seguro</p>
+        <p className="relative hidden text-sm font-medium tracking-wide text-white/70 lg:block">Agenda · Ambiente administrativo seguro</p>
       </section>
 
       <section className="relative flex items-center justify-center px-5 py-14 sm:px-10 lg:px-14">
@@ -57,7 +57,7 @@ export default async function HomePage() {
             ) : null}
             <LoginForm />
           </div>
-          <p className="mt-7 text-center text-xs leading-5 text-zinc-500">
+          <p className="mt-7 text-center text-sm leading-6 text-zinc-500">
             Acesso restrito à equipe. Dados separados por estabelecimento.
           </p>
         </div>

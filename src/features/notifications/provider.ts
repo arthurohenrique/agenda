@@ -1,36 +1,54 @@
 import "server-only";
 
 import { getServerEnv } from "@/lib/env";
+import {
+  resolveNotificationProviderConfig,
+  type NotificationProviderConfig,
+} from "./policy";
 import type { NotificationDelivery, NotificationMessage } from "./types";
+
+function getNotificationProviderConfig(): NotificationProviderConfig {
+  const env = getServerEnv();
+  return resolveNotificationProviderConfig(
+    {
+      mode: env.NOTIFICATION_MODE,
+      webhookUrl: env.NOTIFICATION_WEBHOOK_URL,
+      webhookSecret: env.NOTIFICATION_WEBHOOK_SECRET,
+    },
+    process.env.NODE_ENV,
+  );
+}
+
+export function assertNotificationProviderConfigured(): void {
+  getNotificationProviderConfig();
+}
 
 export async function deliverNotification(
   message: NotificationMessage,
 ): Promise<NotificationDelivery> {
-  const env = getServerEnv();
-  const mode = env.NOTIFICATION_MODE ?? (process.env.NODE_ENV === "production" ? undefined : "dry-run");
+  const config = getNotificationProviderConfig();
 
-  if (mode === "dry-run") {
+  if (config.mode === "dry-run") {
     return { provider: "dry-run", providerMessageId: `dry-run:${message.eventId}` };
   }
 
-  if (
-    mode !== "webhook" ||
-    !env.NOTIFICATION_WEBHOOK_URL ||
-    !env.NOTIFICATION_WEBHOOK_SECRET
-  ) {
-    throw new Error("notification_provider_not_configured");
+  let response: Response;
+  try {
+    response = await fetch(config.webhookUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.webhookSecret}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": message.eventId,
+      },
+      body: JSON.stringify(message),
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new Error("notification_provider_unavailable");
   }
-
-  const response = await fetch(env.NOTIFICATION_WEBHOOK_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.NOTIFICATION_WEBHOOK_SECRET}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(message),
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-  });
 
   if (!response.ok) throw new Error(`notification_provider_http_${response.status}`);
   const body: unknown = await response.json().catch(() => ({}));

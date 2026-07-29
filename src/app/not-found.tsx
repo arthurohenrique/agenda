@@ -3,7 +3,7 @@ import { CalendarX2 } from "lucide-react";
 
 export default function NotFound() {
   return (
-    <main className="grid min-h-dvh place-items-center px-5 py-16">
+    <main className="grid min-h-dvh place-items-center px-5 py-16" id="main-content" tabIndex={-1}>
       <div className="max-w-md text-center">
         <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-zinc-200 text-zinc-600">
           <CalendarX2 aria-hidden="true" size={28} />

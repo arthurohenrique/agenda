@@ -88,6 +88,9 @@ export function AgendaBoard({
             {appointments.length}
           </span>
         </header>
+        <p aria-live="polite" className="sr-only" role="status">
+          {selectedAppointment ? `Detalhes de ${selectedAppointment.customerName} exibidos.` : "Detalhes fechados."}
+        </p>
 
         <ol className="divide-y divide-zinc-100" aria-label="Atendimentos do período">
           {appointments.map((appointment) => {
@@ -99,7 +102,6 @@ export function AgendaBoard({
                 <button
                   aria-controls="appointment-details"
                   aria-expanded={isSelected}
-                  aria-pressed={isSelected}
                   className={cn(
                     "grid w-full grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 text-left transition sm:px-5",
                     isSelected ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "hover:bg-zinc-50",
@@ -112,12 +114,12 @@ export function AgendaBoard({
                   </time>
                   <span className="min-w-0 border-l border-zinc-200 pl-3">
                     <span className="block truncate text-sm font-bold">{appointment.customerName}</span>
-                    <span className={cn("mt-0.5 block truncate text-xs", isSelected ? "text-zinc-300" : "text-zinc-500")}>
+                    <span className={cn("mt-0.5 block truncate text-xs", isSelected ? "text-white" : "text-zinc-500")}>
                       {appointment.serviceName}
                     </span>
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className={cn("hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold sm:inline-flex", isSelected ? "border-white/25 bg-white/10 text-white" : presentation.className)}>
+                    <span className={cn("hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold sm:inline-flex", isSelected ? "border-white/80 bg-black/15 text-white" : presentation.className)}>
                       <StatusIcon aria-hidden="true" size={12} />
                       {presentation.label}
                     </span>
@@ -139,7 +141,7 @@ export function AgendaBoard({
               <span className="mx-auto grid size-10 place-items-center rounded-xl bg-zinc-100 text-zinc-500">
                 <UserRound aria-hidden="true" size={19} />
               </span>
-              <h2 className="mt-3 font-bold">Atendimento em foco</h2>
+              <h2 className="mt-3 font-bold" id="appointment-details-title" tabIndex={-1}>Atendimento em foco</h2>
               <p className="mt-1.5 text-sm leading-6 text-zinc-500">Selecione um horário para revelar cliente, profissional e ações.</p>
             </div>
           </div>
@@ -167,7 +169,7 @@ function AppointmentDetails({
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">Atendimento selecionado</p>
-      <h2 className="mt-2 text-xl font-bold tracking-[-0.025em]">{appointment.customerName}</h2>
+      <h2 className="mt-2 text-xl font-bold tracking-[-0.025em]" id="appointment-details-title" tabIndex={-1}>{appointment.customerName}</h2>
       <p className="mt-1 text-sm text-zinc-600">{appointment.serviceName}</p>
 
       <span className={cn("mt-5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold", presentation.className)}>
