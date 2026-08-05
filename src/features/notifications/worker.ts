@@ -24,6 +24,38 @@ const outboxEventSchema = z.object({
   attempts: z.number().int().min(1).max(8),
 });
 
+const whatsappEnqueueResultSchema = z.object({
+  status: z.enum(["queued", "blocked", "skipped"]),
+  reason: z.string().optional(),
+});
+
+const terminalNotificationReasons = new Set([
+  "event_already_processed",
+  "reminder_not_applicable",
+]);
+
+async function enqueueWhatsAppNotification(
+  admin: ReturnType<typeof createAdminClient>,
+  eventId: string,
+) {
+  const { data, error } = await admin.rpc(
+    "enqueue_whatsapp_appointment_notification",
+    { p_outbox_event_id: eventId },
+  );
+  if (error) throw new Error("whatsapp_notification_enqueue_failed");
+  const parsed = whatsappEnqueueResultSchema.safeParse(data);
+  if (!parsed.success) throw new Error("whatsapp_notification_result_invalid");
+  return parsed.data;
+}
+
+function isTerminalNotificationResult(
+  result: z.infer<typeof whatsappEnqueueResultSchema>,
+): boolean {
+  return result.status === "skipped" && Boolean(
+    result.reason && terminalNotificationReasons.has(result.reason),
+  );
+}
+
 async function loadMessage(
   event: z.infer<typeof outboxEventSchema>,
 ): Promise<NotificationMessage> {
@@ -98,12 +130,35 @@ export async function processOutbox(limit = 10) {
 
   for (const event of events) {
     try {
+      const whatsapp = await enqueueWhatsAppNotification(admin, event.id);
+      if (isTerminalNotificationResult(whatsapp)) {
+        processed += 1;
+        logger.info("notification_event_skipped", {
+          eventId: event.id,
+          errorCode: whatsapp.reason,
+          result: "not_applicable",
+        });
+        continue;
+      }
+      if (whatsapp.status === "blocked") {
+        logger.info("whatsapp_notification_blocked", {
+          eventId: event.id,
+          errorCode: whatsapp.reason ?? "policy_blocked",
+          result: "blocked",
+        });
+      }
       const message = await loadMessage(event);
       await deliverNotification(message);
       const { data: completed, error: completeError } = await admin.rpc("complete_outbox_event", {
         p_event_id: event.id,
       });
-      if (completeError || completed !== true) throw new Error("outbox_complete_failed");
+      if (completeError) throw new Error("outbox_complete_failed");
+      if (completed !== true) {
+        const latest = await enqueueWhatsAppNotification(admin, event.id);
+        if (!isTerminalNotificationResult(latest)) {
+          throw new Error("outbox_complete_failed");
+        }
+      }
       processed += 1;
     } catch (eventError) {
       failed += 1;

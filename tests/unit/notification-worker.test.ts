@@ -47,6 +47,7 @@ function setupWorker({
   deferData = true,
   deferError = null,
   servicesError = null,
+  whatsappResult = { status: "skipped", reason: "channel_disabled" },
 }: {
   attempts?: number;
   completeData?: boolean | null;
@@ -54,6 +55,7 @@ function setupWorker({
   deferData?: boolean | null;
   deferError?: unknown;
   servicesError?: unknown;
+  whatsappResult?: { status: "queued" | "blocked" | "skipped"; reason?: string };
 } = {}) {
   const claimedEvent = { ...event, attempts };
   const processAdmin = {
@@ -63,6 +65,9 @@ function setupWorker({
         return { data: completeData, error: completeError };
       }
       if (name === "defer_outbox_event") return { data: deferData, error: deferError };
+      if (name === "enqueue_whatsapp_appointment_notification") {
+        return { data: whatsappResult, error: null };
+      }
       throw new Error("unexpected_rpc");
     }),
   };
@@ -144,6 +149,28 @@ describe("notification worker logging", () => {
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "notification_delivery_rejected",
       expect.objectContaining({ errorCode: "notification_context_not_found" }),
+    );
+  });
+
+  it("drops a reminder invalidated after claim without loading or delivering it", async () => {
+    const processAdmin = setupWorker({
+      whatsappResult: { status: "skipped", reason: "reminder_not_applicable" },
+    });
+
+    await expect(processOutbox()).resolves.toEqual({
+      claimed: 1,
+      processed: 1,
+      failed: 0,
+    });
+    expect(mocks.createAdminClient).toHaveBeenCalledOnce();
+    expect(mocks.deliverNotification).not.toHaveBeenCalled();
+    expect(processAdmin.rpc).not.toHaveBeenCalledWith(
+      "complete_outbox_event",
+      expect.anything(),
+    );
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "notification_event_skipped",
+      expect.objectContaining({ errorCode: "reminder_not_applicable" }),
     );
   });
 

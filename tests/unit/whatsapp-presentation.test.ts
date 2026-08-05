@@ -1,0 +1,183 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildWhatsAppBookingLink,
+  maskWhatsAppContact,
+  maskWhatsAppConversation,
+} from "@/features/whatsapp/presentation/queries";
+import {
+  mergeTenantWhatsAppMetadata,
+  parseTenantWhatsAppMetadata,
+  tenantWhatsAppSettingsFormSchema,
+} from "@/features/whatsapp/presentation/settings-contract";
+import {
+  bookingStartResponses,
+  listResponse,
+  replyButtonsResponse,
+  WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH,
+} from "@/features/whatsapp/presentation/conversation-responses";
+import {
+  whatsappSimulatorInputSchema,
+  whatsappSimulatorResponseSchema,
+} from "@/features/whatsapp/presentation/simulator-contract";
+
+describe("apresentação do WhatsApp", () => {
+  it("gera link legível e codificado sem tratar código como credencial", () => {
+    const result = buildWhatsAppBookingLink({
+      normalizedPhoneNumber: "+5511999990001",
+      displayPhoneNumber: null,
+      tenantName: "Salão da Ana",
+      routingCode: "ABC123",
+    });
+
+    expect(result?.message).toBe("Olá! Quero agendar na Salão da Ana. Código: ABC123");
+    expect(result?.link).toBe(
+      `https://wa.me/5511999990001?text=${encodeURIComponent("Olá! Quero agendar na Salão da Ana. Código: ABC123")}`,
+    );
+  });
+
+  it("não gera link sem número ou código válido", () => {
+    expect(buildWhatsAppBookingLink({
+      normalizedPhoneNumber: "123",
+      displayPhoneNumber: null,
+      tenantName: "Tenant",
+      routingCode: "ABC123",
+    })).toBeNull();
+    expect(buildWhatsAppBookingLink({
+      normalizedPhoneNumber: "+5511999990001",
+      displayPhoneNumber: null,
+      tenantName: "Tenant",
+      routingCode: null,
+    })).toBeNull();
+  });
+
+  it("interpreta lembretes e horário silencioso pelo contrato consumido no banco", () => {
+    expect(parseTenantWhatsAppMetadata({})).toMatchObject({
+      reminder24Hours: true,
+      reminder2Hours: true,
+      quietHoursEnabled: false,
+    });
+    expect(parseTenantWhatsAppMetadata({
+      reminder_minutes_before: [120],
+      quiet_hours: { start: "21:30", end: "07:15" },
+      administrative_notice: "Feriado",
+    })).toMatchObject({
+      reminder24Hours: false,
+      reminder2Hours: true,
+      quietHoursEnabled: true,
+      quietHoursStart: "21:30",
+      quietHoursEnd: "07:15",
+      administrativeNotice: "Feriado",
+    });
+    expect(parseTenantWhatsAppMetadata({ allowed_service_ids: "inválido" }).allowedServiceIds).toEqual([]);
+  });
+
+  it("mescla preferências sem apagar metadata de outros processos", () => {
+    const input = tenantWhatsAppSettingsFormSchema.parse({
+      slug: "barbearia-demo",
+      enabled: "on",
+      bookingEnabled: "on",
+      remindersEnabled: "on",
+      cancellationsEnabled: undefined,
+      reschedulingEnabled: undefined,
+      humanHandoffEnabled: "on",
+      reminder24Hours: undefined,
+      reminder2Hours: "on",
+      quietHoursEnabled: "on",
+      quietHoursStart: "22:00",
+      quietHoursEnd: "08:00",
+      serviceIds: ["00000000-0000-4000-8000-000000000001"],
+      locationIds: ["00000000-0000-4000-8000-000000000002"],
+      humanHandoffPhone: "+5511999990001",
+      humanHandoffEmail: "equipe@example.com",
+      welcomeMessage: "Olá",
+      administrativeNotice: "Aviso",
+      emergencyNotice: "Emergência",
+    });
+    const merged = mergeTenantWhatsAppMetadata({ retained: { safe: true } }, input);
+
+    expect(merged).toMatchObject({
+      retained: { safe: true },
+      reminder_minutes_before: [120],
+      quiet_hours: { start: "22:00", end: "08:00" },
+      allowed_service_ids: ["00000000-0000-4000-8000-000000000001"],
+      allowed_location_ids: ["00000000-0000-4000-8000-000000000002"],
+    });
+  });
+
+  it("mascara conversa e contato antes de montar o painel", () => {
+    expect(maskWhatsAppConversation("00000000-0000-4000-8000-123456789abc")).toBe("…56789abc");
+    expect(maskWhatsAppContact({
+      profileName: "Ana",
+      normalizedPhone: "+5511999990001",
+    })).toBe("A•• · •••• 0001");
+  });
+
+  it("aceita somente evento fictício com telefone E.164 e opções fechadas", () => {
+    const input = {
+      receiverPhoneNumberId: "mock-phone",
+      customerPhone: "+5511999990001",
+      message: "Olá",
+      interactionType: "text",
+      simulation: { duplicate: true, providerFailure: false, outOfOrder: false, delayMs: 500 },
+    };
+    expect(whatsappSimulatorInputSchema.safeParse(input).success).toBe(true);
+    expect(whatsappSimulatorInputSchema.safeParse({ ...input, customerPhone: "11999990001" }).success).toBe(false);
+    expect(whatsappSimulatorInputSchema.safeParse({ ...input, simulation: { ...input.simulation, delayMs: 999 } }).success).toBe(false);
+    expect(whatsappSimulatorInputSchema.safeParse({ ...input, interactionType: "button" }).success).toBe(false);
+  });
+
+  it("normaliza resposta mínima sem exigir detalhes do provedor", () => {
+    const parsed = whatsappSimulatorResponseSchema.parse({
+      conversation: null,
+      tenant: null,
+      responses: [{ kind: "text", body: "Escolha um estabelecimento." }],
+      delivery: {
+        providerFailureInjected: true,
+        attempts: 2,
+        firstAttempt: { claimed: 1, sent: 0, failed: 1 },
+        retryAttempt: { claimed: 1, sent: 1, failed: 0 },
+        recovered: true,
+      },
+    });
+    expect(parsed.messages).toEqual([]);
+    expect(parsed.responses[0]?.kind).toBe("text");
+    expect(parsed.delivery?.recovered).toBe(true);
+  });
+
+  it("limita corpos de listas e botões sem alterar o limite do provedor", () => {
+    const oversizedBody = "A".repeat(2000);
+    const options = [{
+      key: "1",
+      label: "Corte",
+      value: "00000000-0000-4000-8000-000000000001",
+      kind: "service" as const,
+    }];
+    const responses = [
+      listResponse(oversizedBody, "Escolher", options),
+      replyButtonsResponse(oversizedBody, options, 3),
+    ];
+
+    for (const response of responses) {
+      expect(response.kind === "list" || response.kind === "reply_buttons").toBe(true);
+      if (response.kind !== "list" && response.kind !== "reply_buttons") continue;
+      expect(response.body).toHaveLength(WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH);
+      expect(response.body.endsWith("…")).toBe(true);
+    }
+  });
+
+  it("preserva um prompt no limite mesmo quando avisos precisam ser omitidos", () => {
+    const prompt = "P".repeat(WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH);
+    const [response] = bookingStartResponses({
+      emergencyNotice: "Emergência",
+      administrativeNotice: "Aviso",
+      welcomeMessage: "Olá",
+      prompt,
+      buttonText: "Escolher",
+      options: [{ key: "1", label: "Corte", value: "service", kind: "service" }],
+    });
+
+    expect(response?.kind).toBe("list");
+    if (response?.kind !== "list") return;
+    expect(response.body).toBe(prompt);
+  });
+});

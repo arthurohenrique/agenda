@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { LoginForm } from "@/components/auth/login-form";
@@ -6,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getTenantMemberships } from "@/features/tenants/queries";
+import { getPlatformOwnerAccess } from "@/features/platform/access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,8 @@ export default async function HomePage() {
   const user = await getCurrentUser();
 
   if (user) {
+    const platformOwner = await getPlatformOwnerAccess();
+    if (platformOwner) redirect("/app/platform/whatsapp" as Route);
     const memberships = await getTenantMemberships();
     if (memberships.length === 1 && memberships[0]) {
       redirect(`/app/${memberships[0].slug}`);

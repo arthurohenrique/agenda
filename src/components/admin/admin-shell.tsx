@@ -9,6 +9,7 @@ import {
   ContactRound,
   LogOut,
   Menu,
+  MessageCircleMore,
   Settings2,
   Sparkles,
   UsersRound,
@@ -18,6 +19,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { Brand } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { TenantContext } from "@/features/tenants/access";
+import { canOperateTenantWhatsAppHandoffs } from "@/features/whatsapp/presentation/access";
 import { useModalFocus } from "@/hooks/use-modal-focus";
 
 interface TenantTheme {
@@ -29,12 +31,13 @@ interface TenantTheme {
 }
 
 const navigation = [
-  { label: "Agenda", icon: CalendarDays, path: "" },
-  { label: "Clientes", icon: ContactRound, path: "/clientes" },
-  { label: "Serviços", icon: Sparkles, path: "/servicos" },
-  { label: "Equipe", icon: UsersRound, path: "/profissionais" },
-  { label: "Relatórios", icon: BarChart3, path: "/relatorios" },
-  { label: "Configurações", icon: Settings2, path: "/configuracoes" },
+  { label: "Agenda", icon: CalendarDays, path: "", manageOnly: false },
+  { label: "Clientes", icon: ContactRound, path: "/clientes", manageOnly: false },
+  { label: "Serviços", icon: Sparkles, path: "/servicos", manageOnly: false },
+  { label: "Equipe", icon: UsersRound, path: "/profissionais", manageOnly: false },
+  { label: "WhatsApp", icon: MessageCircleMore, path: "/whatsapp", manageOnly: true },
+  { label: "Relatórios", icon: BarChart3, path: "/relatorios", manageOnly: false },
+  { label: "Configurações", icon: Settings2, path: "/configuracoes", manageOnly: false },
 ] as const;
 
 export function AdminShell({
@@ -61,9 +64,18 @@ export function AdminShell({
     return path === "" ? pathname === href : pathname.startsWith(href);
   }
 
+  const canAccessWhatsApp = canOperateTenantWhatsAppHandoffs(
+    tenant.role,
+    tenant.permissions,
+  );
+
   const navigationLinks = (
     <nav className="mt-7 grid gap-1.5" aria-label="Navegação principal">
-      {navigation.map(({ icon: Icon, label, path }) => {
+      {navigation.filter((item) => (
+        item.path === "/whatsapp"
+          ? canAccessWhatsApp
+          : !item.manageOnly || tenant.role === "owner" || tenant.role === "admin"
+      )).map(({ icon: Icon, label, path }) => {
         const active = isActive(path);
         return (
           <Link

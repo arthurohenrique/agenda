@@ -23,7 +23,8 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'dono.barbearia@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Rafael Demo"}', '', '', '', '', '', '', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'dona.salao@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Ana Demo"}', '', '', '', '', '', '', now(), now()),
   ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'dona.clinica@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Camila Demo"}', '', '', '', '', '', '', now(), now()),
-  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'multi@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Operação Multi"}', '', '', '', '', '', '', now(), now())
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'multi@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"name":"Operação Multi"}', '', '', '', '', '', '', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '10000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'operador@agenda.local', extensions.crypt('AgendaLocal123!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"],"platform_owner":true}', '{"name":"Operador da Plataforma"}', '', '', '', '', '', '', now(), now())
 on conflict (id) do nothing;
 
 insert into auth.identities (
@@ -32,7 +33,8 @@ insert into auth.identities (
   ('11000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'dono.barbearia@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000001","email":"dono.barbearia@agenda.local"}', 'email', now(), now(), now()),
   ('11000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'dona.salao@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000002","email":"dona.salao@agenda.local"}', 'email', now(), now(), now()),
   ('11000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000003', 'dona.clinica@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000003","email":"dona.clinica@agenda.local"}', 'email', now(), now(), now()),
-  ('11000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000004', 'multi@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000004","email":"multi@agenda.local"}', 'email', now(), now(), now())
+  ('11000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000004', 'multi@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000004","email":"multi@agenda.local"}', 'email', now(), now(), now()),
+  ('11000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000005', 'operador@agenda.local', '{"sub":"10000000-0000-0000-0000-000000000005","email":"operador@agenda.local"}', 'email', now(), now(), now())
 on conflict (provider_id, provider) do nothing;
 
 insert into public.tenants (
@@ -231,3 +233,692 @@ insert into public.appointment_status_history (
 select tenant_id, id, status, 'Dado de demonstração'
 from public.appointments
 where id::text like '80000000-%';
+
+-- WhatsApp oficial em modo mock. Nenhum identificador abaixo representa ativo real da Meta.
+insert into public.whatsapp_business_accounts (
+  id,
+  provider,
+  external_waba_id,
+  ownership_type,
+  owner_tenant_id,
+  status,
+  display_name,
+  metadata,
+  connected_at
+) values
+  (
+    '90000000-0000-4000-8000-000000000001',
+    'mock',
+    'mock-platform-waba',
+    'platform_owned',
+    null,
+    'connected',
+    'Agenda Plataforma Mock',
+    '{"environment":"local","credential":"none"}',
+    now()
+  ),
+  (
+    '90000000-0000-4000-8000-000000000002',
+    'mock',
+    'mock-clinica-waba',
+    'tenant_owned',
+    '20000000-0000-0000-0000-000000000003',
+    'connected',
+    'Clínica Vida Mock',
+    '{"environment":"local","credential":"none"}',
+    now()
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_phone_numbers (
+  id,
+  business_account_id,
+  provider,
+  external_phone_number_id,
+  display_phone_number,
+  normalized_phone_number,
+  verified_name,
+  connection_mode,
+  status,
+  is_default,
+  quality_status,
+  messaging_limit_tier,
+  metadata
+) values
+  (
+    '91000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000001',
+    'mock',
+    'mock-phone-central',
+    '+55 11 99999-0000',
+    '+5511999990000',
+    'Agenda Central Mock',
+    'shared_platform',
+    'connected',
+    true,
+    'GREEN',
+    'LOCAL_ONLY',
+    '{"simulated":true}'
+  ),
+  (
+    '91000000-0000-4000-8000-000000000002',
+    '90000000-0000-4000-8000-000000000001',
+    'mock',
+    'mock-phone-exclusive-clinic',
+    '+55 11 99999-0001',
+    '+5511999990001',
+    'Clínica Exclusivo Mock',
+    'exclusive_platform',
+    'connected',
+    false,
+    'GREEN',
+    'LOCAL_ONLY',
+    '{"simulated":true}'
+  ),
+  (
+    '91000000-0000-4000-8000-000000000003',
+    '90000000-0000-4000-8000-000000000002',
+    'mock',
+    'mock-phone-tenant-owned-clinic',
+    '+55 11 99999-0002',
+    '+5511999990002',
+    'Clínica Próprio Mock',
+    'tenant_owned',
+    'connected',
+    true,
+    'GREEN',
+    'LOCAL_ONLY',
+    '{"simulated":true}'
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_phone_number_tenants (
+  id, phone_number_id, tenant_id, location_id, routing_mode, purpose, is_primary, status
+) values
+  (
+    '92000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    null,
+    'shared',
+    'booking',
+    true,
+    'active'
+  ),
+  (
+    '92000000-0000-4000-8000-000000000002',
+    '91000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000002',
+    null,
+    'shared',
+    'booking',
+    true,
+    'active'
+  ),
+  (
+    '92000000-0000-4000-8000-000000000003',
+    '91000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000003',
+    null,
+    'shared',
+    'booking',
+    false,
+    'active'
+  ),
+  (
+    '92000000-0000-4000-8000-000000000004',
+    '91000000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000003',
+    '30000000-0000-0000-0000-000000000003',
+    'direct',
+    'booking',
+    true,
+    'active'
+  ),
+  (
+    '92000000-0000-4000-8000-000000000005',
+    '91000000-0000-4000-8000-000000000003',
+    '20000000-0000-0000-0000-000000000003',
+    '30000000-0000-0000-0000-000000000003',
+    'direct',
+    'support',
+    false,
+    'active'
+  )
+on conflict (id) do nothing;
+
+insert into public.tenant_whatsapp_settings (
+  tenant_id,
+  enabled,
+  preferred_phone_number_id,
+  booking_enabled,
+  reminders_enabled,
+  cancellations_enabled,
+  rescheduling_enabled,
+  human_handoff_enabled,
+  welcome_message,
+  unknown_message_response,
+  session_timeout_minutes,
+  default_language,
+  metadata
+) values
+  (
+    '20000000-0000-0000-0000-000000000001',
+    true,
+    '91000000-0000-4000-8000-000000000001',
+    true,
+    true,
+    true,
+    true,
+    true,
+    'Olá! Vamos encontrar um horário para você.',
+    'Não entendi. Digite Ajuda para ver as opções.',
+    30,
+    'pt-BR',
+    '{"mode":"mock"}'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000002',
+    true,
+    '91000000-0000-4000-8000-000000000001',
+    true,
+    true,
+    true,
+    true,
+    true,
+    'Olá! Como podemos cuidar de você hoje?',
+    'Escolha uma opção do menu ou digite Ajuda.',
+    45,
+    'pt-BR',
+    '{"mode":"mock"}'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000003',
+    true,
+    '91000000-0000-4000-8000-000000000002',
+    true,
+    true,
+    true,
+    true,
+    true,
+    'Olá! Vamos organizar seu atendimento.',
+    'Digite Ajuda para continuar.',
+    20,
+    'pt-BR',
+    '{"mode":"mock","exclusive":true,"administrative_notice":"Canal destinado somente a agendamentos e informações administrativas. Em caso de emergência, procure o serviço de atendimento apropriado."}'
+  )
+on conflict (tenant_id) do nothing;
+
+insert into public.whatsapp_routing_codes (
+  id, tenant_id, phone_number_id, code, type, campaign, source, status, metadata
+) values
+  (
+    '93000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    'BARB01',
+    'permanent_tenant_code',
+    null,
+    'seed',
+    'active',
+    '{"simulated":true}'
+  ),
+  (
+    '93000000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000002',
+    '91000000-0000-4000-8000-000000000001',
+    'SALA01',
+    'permanent_tenant_code',
+    null,
+    'seed',
+    'active',
+    '{"simulated":true}'
+  ),
+  (
+    '93000000-0000-4000-8000-000000000003',
+    '20000000-0000-0000-0000-000000000003',
+    '91000000-0000-4000-8000-000000000001',
+    'CLIN01',
+    'permanent_tenant_code',
+    null,
+    'seed',
+    'active',
+    '{"simulated":true}'
+  ),
+  (
+    '93000000-0000-4000-8000-000000000004',
+    '20000000-0000-0000-0000-000000000003',
+    '91000000-0000-4000-8000-000000000002',
+    'EXCL01',
+    'campaign_code',
+    'exclusive-local',
+    'seed',
+    'active',
+    '{"simulated":true}'
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_contacts (
+  id, provider, normalized_phone, whatsapp_user_id, profile_name, customer_id, metadata
+) values
+  (
+    '94000000-0000-4000-8000-000000000001',
+    'mock',
+    '+551199990001',
+    '551199990001',
+    'João Cliente',
+    '70000000-0000-0000-0000-000000000001',
+    '{"simulated":true}'
+  ),
+  (
+    '94000000-0000-4000-8000-000000000002',
+    'mock',
+    '+551199990002',
+    '551199990002',
+    'Luiza Cliente',
+    '70000000-0000-0000-0000-000000000002',
+    '{"simulated":true}'
+  ),
+  (
+    '94000000-0000-4000-8000-000000000003',
+    'mock',
+    '+551199990004',
+    '551199990004',
+    'Beatriz Cliente',
+    '70000000-0000-0000-0000-000000000004',
+    '{"simulated":true}'
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_conversations (
+  id,
+  phone_number_id,
+  contact_id,
+  tenant_id,
+  status,
+  current_state,
+  service_window_expires_at,
+  session_expires_at,
+  assigned_user_id,
+  handoff_requested_at,
+  last_inbound_at,
+  last_outbound_at,
+  context,
+  version
+) values
+  (
+    '95000000-0000-4000-8000-000000000001',
+    '91000000-0000-4000-8000-000000000001',
+    '94000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'waiting_customer',
+    'SERVICE_SELECTION',
+    now() + interval '24 hours',
+    now() + interval '30 minutes',
+    null,
+    null,
+    now(),
+    now(),
+    '{"selectedTenantSource":"routing_code"}',
+    2
+  ),
+  (
+    '95000000-0000-4000-8000-000000000002',
+    '91000000-0000-4000-8000-000000000001',
+    '94000000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000002',
+    'human_handoff',
+    'HUMAN_HANDOFF',
+    now() + interval '24 hours',
+    now() + interval '45 minutes',
+    null,
+    now(),
+    now(),
+    now(),
+    '{"handoffReason":"customer_request"}',
+    3
+  ),
+  (
+    '95000000-0000-4000-8000-000000000003',
+    '91000000-0000-4000-8000-000000000001',
+    '94000000-0000-4000-8000-000000000003',
+    null,
+    'waiting_customer',
+    'TENANT_SEARCH',
+    now() + interval '24 hours',
+    now() + interval '30 minutes',
+    null,
+    null,
+    now(),
+    now(),
+    '{"knownTenantCount":0}',
+    1
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_messages (
+  id,
+  conversation_id,
+  tenant_id,
+  provider,
+  direction,
+  message_type,
+  provider_message_id,
+  external_event_key,
+  idempotency_key,
+  status,
+  content,
+  normalized_content,
+  sent_at
+) values
+  (
+    '96000000-0000-4000-8000-000000000001',
+    '95000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'mock',
+    'inbound',
+    'text',
+    'mock-inbound-001',
+    'mock-event-message-001',
+    null,
+    'received',
+    '{"text":"Olá, código BARB01"}',
+    '{"text":"ola codigo barb01"}',
+    null
+  ),
+  (
+    '96000000-0000-4000-8000-000000000002',
+    '95000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'mock',
+    'outbound',
+    'text',
+    'mock-outbound-001',
+    null,
+    'seed-response-001',
+    'sent',
+    '{"text":"Qual serviço você deseja?"}',
+    '{"text":"Qual serviço você deseja?"}',
+    now()
+  ),
+  (
+    '96000000-0000-4000-8000-000000000003',
+    '95000000-0000-4000-8000-000000000003',
+    null,
+    'mock',
+    'outbound',
+    'text',
+    null,
+    null,
+    'seed-response-tenant-search',
+    'queued',
+    '{"text":"Qual estabelecimento você procura?"}',
+    '{"text":"Qual estabelecimento você procura?"}',
+    null
+  ),
+  (
+    '96000000-0000-4000-8000-000000000004',
+    '95000000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000002',
+    'mock',
+    'outbound',
+    'text',
+    null,
+    null,
+    'seed-response-handoff',
+    'queued',
+    '{"text":"Vou chamar um atendente."}',
+    '{"text":"Vou chamar um atendente."}',
+    null
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_webhook_events (
+  id,
+  provider,
+  external_event_key,
+  event_type,
+  phone_number_id,
+  correlation_id,
+  ordering_keys,
+  signature_valid,
+  payload,
+  processing_status,
+  attempts,
+  next_attempt_at,
+  received_at,
+  processed_at,
+  last_error
+) values
+  (
+    '97000000-0000-4000-8000-000000000001',
+    'mock',
+    'mock-envelope-processed-001',
+    'messages',
+    '91000000-0000-4000-8000-000000000001',
+    '97100000-0000-4000-8000-000000000001',
+    array[repeat('1', 64)],
+    true,
+    '{"fixture":"text","sanitized":true}',
+    'processed',
+    1,
+    now(),
+    now(),
+    now(),
+    null
+  ),
+  (
+    '97000000-0000-4000-8000-000000000002',
+    'mock',
+    'mock-envelope-dead-001',
+    'unknown',
+    '91000000-0000-4000-8000-000000000001',
+    '97100000-0000-4000-8000-000000000002',
+    array[repeat('2', 64)],
+    true,
+    '{"fixture":"unknown","sanitized":true}',
+    'dead_letter',
+    8,
+    now(),
+    now(),
+    now(),
+    'mock_permanent_error'
+  ),
+  (
+    '97000000-0000-4000-8000-000000000003',
+    'mock',
+    'mock-envelope-pending-001',
+    'messages',
+    '91000000-0000-4000-8000-000000000001',
+    '97100000-0000-4000-8000-000000000003',
+    array[repeat('3', 64)],
+    true,
+    '{"fixture":"pending","sanitized":true}',
+    'received',
+    0,
+    now(),
+    now(),
+    null,
+    null
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_outbox (
+  id,
+  tenant_id,
+  phone_number_id,
+  provider,
+  conversation_id,
+  message_id,
+  recipient,
+  message_kind,
+  payload,
+  scheduled_for,
+  status,
+  attempt_count,
+  next_attempt_at,
+  last_error
+) values
+  (
+    '98000000-0000-4000-8000-000000000001',
+    null,
+    '91000000-0000-4000-8000-000000000001',
+    'mock',
+    '95000000-0000-4000-8000-000000000003',
+    '96000000-0000-4000-8000-000000000003',
+    '+551199990004',
+    'text',
+    '{"recipient":"+551199990004","response":{"kind":"text","body":"Qual estabelecimento você procura?"},"idempotencyKey":"seed-response-tenant-search","purpose":"conversation_reply"}',
+    now(),
+    'pending',
+    0,
+    now(),
+    null
+  ),
+  (
+    '98000000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000002',
+    '91000000-0000-4000-8000-000000000001',
+    'mock',
+    '95000000-0000-4000-8000-000000000002',
+    '96000000-0000-4000-8000-000000000004',
+    '+551199990002',
+    'text',
+    '{"recipient":"+551199990002","response":{"kind":"text","body":"Vou chamar um atendente."},"idempotencyKey":"seed-response-handoff","purpose":"handoff_acknowledgement"}',
+    now(),
+    'retry',
+    2,
+    now(),
+    'mock_transient_error'
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_template_definitions (
+  id,
+  business_account_id,
+  name,
+  language,
+  category,
+  status,
+  components
+) values
+  (
+    '99000000-0000-4000-8000-000000000001',
+    '90000000-0000-4000-8000-000000000001',
+    'appointment_created_local',
+    'pt_BR',
+    'utility',
+    'local_draft',
+    '[{"type":"BODY","text":"Agendamento criado para {{1}}."}]'
+  ),
+  (
+    '99000000-0000-4000-8000-000000000002',
+    '90000000-0000-4000-8000-000000000001',
+    'appointment_reminder_local',
+    'pt_BR',
+    'utility',
+    'local_draft',
+    '[{"type":"BODY","text":"Lembrete do seu horário em {{1}}."}]'
+  )
+on conflict (id) do nothing;
+
+insert into public.tenant_whatsapp_templates (
+  id, tenant_id, template_definition_id, purpose, enabled, variable_mapping
+) values
+  (
+    '99100000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    '99000000-0000-4000-8000-000000000001',
+    'appointment_created',
+    true,
+    '{"1":"appointment.starts_at"}'
+  ),
+  (
+    '99100000-0000-4000-8000-000000000002',
+    '20000000-0000-0000-0000-000000000002',
+    '99000000-0000-4000-8000-000000000002',
+    'appointment_reminder',
+    true,
+    '{"1":"appointment.starts_at"}'
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_opt_ins (
+  id, contact_id, tenant_id, category, status, source, policy_version, evidence, granted_at
+) values
+  (
+    '99200000-0000-4000-8000-000000000001',
+    '94000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'transactional',
+    'granted',
+    'customer_initiated_conversation',
+    'local-v1',
+    '{"simulated":true}',
+    now()
+  ),
+  (
+    '99200000-0000-4000-8000-000000000002',
+    '94000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'reminders',
+    'granted',
+    'customer_initiated_conversation',
+    'local-v1',
+    '{"simulated":true}',
+    now()
+  ),
+  (
+    '99200000-0000-4000-8000-000000000003',
+    '94000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000001',
+    'service_updates',
+    'granted',
+    'customer_initiated_conversation',
+    'local-v1',
+    '{"simulated":true}',
+    now()
+  )
+on conflict (id) do nothing;
+
+insert into public.whatsapp_handoffs (
+  id,
+  conversation_id,
+  tenant_id,
+  requested_by,
+  reason,
+  status,
+  assigned_user_id,
+  requested_at
+) values (
+  '99300000-0000-4000-8000-000000000001',
+  '95000000-0000-4000-8000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
+  'customer',
+  'Cliente pediu atendimento humano no simulador.',
+  'requested',
+  null,
+  now()
+)
+on conflict (id) do nothing;
+
+insert into public.whatsapp_flow_sessions (
+  id,
+  conversation_id,
+  tenant_id,
+  flow_definition_id,
+  flow_token_hash,
+  status,
+  context,
+  expires_at
+) values (
+  '99400000-0000-4000-8000-000000000001',
+  '95000000-0000-4000-8000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'mock-booking-flow',
+  extensions.digest(convert_to('mock-flow-token-local-only', 'UTF8'), 'sha256'),
+  'active',
+  '{"simulated":true}',
+  now() + interval '30 minutes'
+)
+on conflict (id) do nothing;

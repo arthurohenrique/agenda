@@ -81,6 +81,10 @@ export const getPublicTenant = cache(async (slug: string): Promise<PublicTenant 
 
   if (error || !data) return null;
   const row = tenantRowSchema.parse(data);
+  const { data: whatsappConsentAvailable } = await supabase.rpc(
+    "get_public_whatsapp_consent_availability",
+    { p_tenant_slug: row.slug },
+  );
   const profile = row.tenant_profiles;
   const theme = row.theme_settings;
   const location = row.locations.find((item) => item.is_primary) ?? row.locations[0] ?? null;
@@ -96,6 +100,7 @@ export const getPublicTenant = cache(async (slug: string): Promise<PublicTenant 
     email: profile?.email ?? null,
     timezone: row.timezone,
     currency: row.currency,
+    whatsappConsentAvailable: whatsappConsentAvailable === true,
     location: location
       ? {
           id: location.id,

@@ -6,7 +6,7 @@ describe("slugs públicos", () => {
     expect(normalizeSlug("  Salão da Ana!  ")).toBe("salao-da-ana");
   });
 
-  it.each(["app", "api", "auth", "admin", "configuracoes", "definir-senha"])(
+  it.each(["app", "api", "auth", "admin", "configuracoes", "definir-senha", "platform"])(
     "bloqueia rota reservada %s",
     (slug) => expect(isAllowedPublicSlug(slug)).toBe(false),
   );

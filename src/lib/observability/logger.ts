@@ -4,10 +4,18 @@ const contextKeys = [
   "appointmentId",
   "attempt",
   "correlationId",
+  "conversationId",
+  "durationMs",
   "errorCode",
   "eventId",
+  "operation",
+  "phoneNumberId",
+  "providerMessageId",
+  "result",
   "stage",
+  "state",
   "tenantId",
+  "webhookEventId",
 ] as const;
 
 type ContextKey = (typeof contextKeys)[number];

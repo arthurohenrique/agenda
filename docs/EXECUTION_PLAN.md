@@ -12,12 +12,12 @@
 
 ## Fases
 
-- [x] Baseline: lint, tipos, 28 testes e build verdes.
+- [x] Baseline: lint, tipos, testes e build verdes.
 - [x] Vibe Check: 17 categorias auditadas.
 - [x] Hardening inicial: headers, origem, erros, tokens e autorização HTTP.
 - [x] Worker de outbox com lease, retry, idempotência e modo `dry-run`.
 - [x] Exportação LGPD por tenant.
 - [x] Logger estruturado, health check e CI.
 - [ ] Executar pgTAP, integração e E2E com Docker/CI.
-- [ ] Aplicar migrations 0017+ em ambiente escolhido pelo proprietário.
+- [ ] Aplicar migrations 0017–0024 em ambiente escolhido pelo proprietário.
 - [ ] Configurar provedores e verificações manuais de produção.

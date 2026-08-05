@@ -1,0 +1,142 @@
+{
+  "text": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "contacts": [{ "wa_id": "5511999990001", "profile": { "name": "Cliente Fictício" } }],
+          "messages": [{
+            "id": "wamid.fixture.text.001",
+            "from": "5511999990001",
+            "timestamp": "1785508800",
+            "type": "text",
+            "text": { "body": "Olá, código AGENDA1" }
+          }]
+        }
+      }]
+    }]
+  },
+  "button": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "messages": [{
+            "id": "wamid.fixture.button.001",
+            "from": "5511999990001",
+            "timestamp": "1785508801",
+            "type": "interactive",
+            "interactive": { "button_reply": { "id": "confirm_booking", "title": "Confirmar" } }
+          }]
+        }
+      }]
+    }]
+  },
+  "list": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "messages": [{
+            "id": "wamid.fixture.list.001",
+            "from": "5511999990001",
+            "timestamp": "1785508802",
+            "type": "interactive",
+            "interactive": { "list_reply": { "id": "service_fixture_001", "title": "Serviço fictício" } }
+          }]
+        }
+      }]
+    }]
+  },
+  "sent": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "statuses": [{
+            "id": "wamid.fixture.outbound.001",
+            "status": "sent",
+            "timestamp": "1785508810",
+            "recipient_id": "5511999990001"
+          }]
+        }
+      }]
+    }]
+  },
+  "delivered": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "statuses": [{
+            "id": "wamid.fixture.outbound.001",
+            "status": "delivered",
+            "timestamp": "1785508811",
+            "recipient_id": "5511999990001"
+          }]
+        }
+      }]
+    }]
+  },
+  "read": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "statuses": [{
+            "id": "wamid.fixture.outbound.001",
+            "status": "read",
+            "timestamp": "1785508812",
+            "recipient_id": "5511999990001"
+          }]
+        }
+      }]
+    }]
+  },
+  "failed": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{
+        "field": "messages",
+        "value": {
+          "metadata": { "phone_number_id": "phone_fixture_shared" },
+          "statuses": [{
+            "id": "wamid.fixture.outbound.001",
+            "status": "failed",
+            "timestamp": "1785508813",
+            "recipient_id": "5511999990001",
+            "errors": [{ "code": 131026, "title": "Undeliverable" }]
+          }]
+        }
+      }]
+    }]
+  },
+  "unknown": {
+    "object": "whatsapp_business_account",
+    "entry": [{
+      "id": "waba_fixture_001",
+      "changes": [{ "field": "account_update", "value": {} }]
+    }]
+  },
+  "duplicate": ["text", "text"],
+  "invalid": { "object": "whatsapp_business_account", "entry": "invalid" }
+}

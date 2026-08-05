@@ -20,6 +20,8 @@ const knownErrorCodes = new Set([
   "notification_provider_unavailable",
   "notification_recipient_not_found",
   "notification_worker_not_configured",
+  "whatsapp_notification_enqueue_failed",
+  "whatsapp_notification_result_invalid",
   "outbox_claim_failed",
   "outbox_complete_failed",
   "outbox_defer_failed",

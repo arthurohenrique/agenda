@@ -25,6 +25,7 @@ export const publicBookingSchema = z.object({
   timezone: z.string().min(1).max(64),
   customer: bookingCustomerSchema,
   notes: z.string().trim().max(800).optional().default(""),
+  whatsappConsent: z.boolean().optional().default(false),
   idempotencyKey: z.guid(),
   website: z.string().max(0).optional().default(""),
 });

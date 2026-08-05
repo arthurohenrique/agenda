@@ -41,6 +41,7 @@ export interface PublicTenant {
   email: string | null;
   timezone: string;
   currency: string;
+  whatsappConsentAvailable: boolean;
   location: PublicLocation | null;
   theme: ThemeTokens;
 }

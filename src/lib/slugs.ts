@@ -8,6 +8,7 @@ export const reservedSlugs = new Set([
   "configuracoes",
   "definir-senha",
   "onboarding",
+  "platform",
   "suporte",
   "status",
   "favicon.ico",

@@ -21,6 +21,7 @@ import type { AvailableSlot, PublicService, PublicStaff, PublicTenant } from "@/
 
 const detailsSchema = bookingCustomerSchema.extend({
   notes: z.string().trim().max(800, "Use no máximo 800 caracteres."),
+  whatsappConsent: z.boolean(),
   website: z.string().max(0),
 });
 
@@ -87,7 +88,14 @@ export function BookingFlow({ tenant, services, staff, initialDate }: BookingFlo
 
   const form = useForm<DetailsInput>({
     resolver: zodResolver(detailsSchema),
-    defaultValues: { name: "", phone: "", email: "", notes: "", website: "" },
+    defaultValues: {
+      name: "",
+      phone: "",
+      email: "",
+      notes: "",
+      whatsappConsent: false,
+      website: "",
+    },
     mode: "onBlur",
   });
 
@@ -222,6 +230,7 @@ export function BookingFlow({ tenant, services, staff, initialDate }: BookingFlo
         timezone: tenant.timezone,
         customer: { name: details.name, phone: details.phone, email: details.email },
         notes: details.notes,
+        whatsappConsent: details.whatsappConsent,
         website: details.website,
         idempotencyKey: crypto.randomUUID(),
       }),
@@ -414,6 +423,18 @@ export function BookingFlow({ tenant, services, staff, initialDate }: BookingFlo
                       <label className="grid gap-2 text-sm font-medium">Observação<textarea className="min-h-24 resize-y rounded-xl border border-[var(--booking-control-border)] bg-[var(--booking-background)] p-4 text-base font-normal" maxLength={800} {...form.register("notes")} /></label>
                     </div>
                   </details>
+                  {tenant.whatsappConsentAvailable ? (
+                    <label className="flex items-start gap-3 rounded-2xl border border-[var(--booking-control-border)] bg-[var(--booking-surface)] p-4 text-sm leading-6 sm:col-span-2">
+                      <input
+                        className="mt-1 size-5 shrink-0"
+                        type="checkbox"
+                        {...form.register("whatsappConsent")}
+                      />
+                      <span>
+                        Quero receber pelo WhatsApp confirmações, lembretes e atualizações relacionadas aos meus agendamentos enviados por {tenant.name}. Posso revogar essa autorização a qualquer momento.
+                      </span>
+                    </label>
+                  ) : null}
                   <label className="sr-only" aria-hidden="true">Website<input autoComplete="off" tabIndex={-1} {...form.register("website")} /></label>
                   {bookingError ? <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 sm:col-span-2" role="alert">{bookingError}</p> : null}
                   <button className="min-h-13 rounded-full bg-[var(--booking-primary)] px-5 text-base font-semibold text-white transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2" disabled={submitting} type="submit">{submitting ? "Confirmando…" : "Confirmar agendamento"}</button>

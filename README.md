@@ -20,6 +20,22 @@ reservas públicas. Construído com Next.js, TypeScript e Supabase.
 - Paletas 60-30-10 pré-definidas por estabelecimento, refletidas no painel e na reserva pública.
 - Tema claro/escuro por dispositivo, preservando a identidade de cada estabelecimento.
 - RLS forçada, rate limit persistente e prevenção de sobreposição com GiST.
+- Canal WhatsApp oficial preparado com inbox, outbox, roteamento multi-tenant,
+  conversa persistida, links/QR por tenant, retenção, provedor mock e simulador
+  interno; conexão Meta ainda pendente.
+
+## WhatsApp Business Platform
+
+O WhatsApp é outro canal para o mesmo núcleo transacional de disponibilidade,
+criação, cancelamento e reagendamento. O ambiente local usa somente o provedor
+mock: não abre sessão de WhatsApp Web e não envia mensagens reais. O número central
+é roteado por código do estabelecimento, sessão ou histórico; a modelagem também
+aceita números exclusivos, próprios e múltiplos números por tenant.
+
+O tráfego Meta permanece desativado até existirem aplicativo, WABA, número
+registrado, webhook HTTPS, templates aprovados e segredos no cofre. Consulte a
+[decisão arquitetural](docs/adr/0001-whatsapp-cloud-api-channel.md) e o
+[checklist de ativação](docs/whatsapp-meta-activation.md).
 
 ## Identidade visual por estabelecimento
 
@@ -48,8 +64,12 @@ conta. A confirmação recalcula a disponibilidade dentro da transação.
 ```mermaid
 flowchart LR
   Browser["Cliente / equipe"] --> Next["Next.js App Router"]
+  WhatsApp["Meta Cloud API / mock"] --> Inbox["Webhook + inbox"]
+  Inbox --> Next
   Next --> Auth["Supabase Auth"]
   Next --> DB["Postgres + RLS + RPCs"]
+  DB --> Outbox["Outbox WhatsApp"]
+  Outbox --> WhatsApp
   DB --> Realtime["Realtime"]
   Realtime --> Next
 ```
@@ -60,7 +80,7 @@ flowchart LR
 - Datas em UTC com timezone IANA por estabelecimento.
 - Dinheiro em centavos e telefones em E.164.
 - Reservas e bloqueios protegidos por intervalos `tstzrange` e GiST.
-- Schema ativo reduzido a 30 tabelas objetivas.
+- Schema ativo limitado a fluxos que existem na interface ou API.
 
 ## Documentação
 
@@ -75,6 +95,8 @@ flowchart LR
 | [Status de implementação](docs/IMPLEMENTATION_STATUS.md) | Produto e QA |
 | [Plano de hardening](docs/EXECUTION_PLAN.md) | Engenharia e segurança |
 | [Auditoria Vibe Check](security/AUDIT_SUMMARY.md) | Segurança |
+| [ADR do WhatsApp](docs/adr/0001-whatsapp-cloud-api-channel.md) | Engenharia e segurança |
+| [Ativação da Meta](docs/whatsapp-meta-activation.md) | Operação |
 
 ## Stack
 
@@ -92,7 +114,7 @@ Requisitos: Node.js 22.14+, npm 10+ e Docker Desktop.
 npm install
 npx supabase start
 npx supabase db reset
-Copy-Item .env.example .env.local
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -107,10 +129,20 @@ BOOKING_TOKEN_PEPPER=<32-ou-mais-caracteres>
 TRUSTED_CLIENT_IP_HEADER=x-real-ip
 NOTIFICATION_WORKER_SECRET=<32-ou-mais-caracteres>
 NOTIFICATION_MODE=dry-run
+WHATSAPP_ENABLED=false
+WHATSAPP_PROVIDER=mock
+WHATSAPP_SIMULATOR_ENABLED=true
+WHATSAPP_EMBEDDED_SIGNUP_ENABLED=false
+WHATSAPP_WORKER_SECRET=<32-ou-mais-caracteres>
 ```
 
 `dry-run` é exclusivo do desenvolvimento local. Em produção, configure o modo
-`webhook`, a URL e o segredo do provedor.
+`webhook`, a URL e o segredo do provedor. As variáveis Meta ficam vazias até a
+ativação; o simulador usa fixtures e telefones fictícios.
+
+Flows possuem somente contratos internos e falham fechados. Embedded Signup deve
+permanecer `false`: suas rotas retornam `404` quando desativadas e `501` se a flag
+for ligada. Nenhum dos dois integra o estágio pronto.
 
 Nunca exponha `sb_secret`, `service_role` ou peppers em variáveis `NEXT_PUBLIC_*`.
 
@@ -124,6 +156,7 @@ Após o seed local, a senha comum é `AgendaLocal123!`.
 | `dona.salao@agenda.local` | Owner do Salão da Ana |
 | `dona.clinica@agenda.local` | Owner da Clínica Vida |
 | `multi@agenda.local` | Recepção da barbearia e admin do salão |
+| `operador@agenda.local` | Operação global da plataforma e simulador WhatsApp |
 
 Essas credenciais são exclusivamente demonstrativas.
 
@@ -136,8 +169,8 @@ npm run typecheck
 npm run test
 npm run build
 npm run validate
-npm run test:integration
-npm run test:e2e
+RUN_DB_TESTS=1 npm run test:integration
+RUN_E2E_DB=1 npm run test:e2e
 npm run test:db
 ```
 
@@ -152,6 +185,10 @@ npm run test:db
 - CSP, HSTS e headers defensivos são globais.
 - Mutações HTTP rejeitam origem externa.
 - Worker da outbox usa lease, retry e bearer secret.
+- Webhook WhatsApp aplica rate limit, limita payload, valida o corpo bruto e persiste
+  antes de processar.
+- Retenção WhatsApp usa TTL versionado, legal hold e worker interno em lotes.
+- Painéis globais e simulador exigem `platform_owner`; configurações do tenant usam RLS.
 - Auditoria Vibe Check cobre 17 categorias.
 
 Antes da produção, configure SMTP, redirect URLs, MFA para papéis críticos,

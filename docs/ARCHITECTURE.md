@@ -64,7 +64,7 @@ erDiagram
   TENANTS ||--o{ OUTBOX_EVENTS : emits
 ```
 
-Schema ativo possui 30 tabelas. Migration `0016` removeu addons, notas avançadas,
+Schema público ativo possui 47 tabelas. Migration `0016` removeu addons, notas avançadas,
 preferências, consentimentos, formulários, lista de espera e tabelas antigas de
 notificação porque não possuíam fluxo ativo.
 
@@ -97,6 +97,57 @@ no banco.
 Worker não registra nome, telefone ou e-mail. PII existe apenas em memória durante
 a entrega necessária.
 
+## Canal WhatsApp
+
+WhatsApp entra como canal do mesmo núcleo de agendamentos. Webhook e simulador
+normalizam eventos para contratos internos; roteamento e máquina de estados não
+dependem de payload Meta nem de componentes React.
+
+```mermaid
+flowchart LR
+  P["Meta Cloud API ou mock"] --> H["Webhook normalizado"]
+  H --> I["Inbox WhatsApp"]
+  I --> T["Roteador de tenant"]
+  T --> C["Motor de conversa"]
+  C --> G["Gateway da agenda"]
+  G --> D["Disponibilidade e RPCs existentes"]
+  C --> O["Outbox WhatsApp"]
+  O --> P
+```
+
+O primeiro estágio usa provedor mock. A conta Meta, aplicativo, WABA, número real,
+webhook remoto e templates aprovados continuam pendentes. A interface global expõe
+essa diferença e não apresenta o canal real como ativo.
+
+O painel `/app/platform/*` exige claim `app_metadata.platform_owner` validada no
+servidor. Painéis `/app/{slug}/*` continuam exigindo associação ao tenant. Conversas
+sem tenant resolvido pertencem ao contexto da plataforma; após resolução, RLS limita
+acesso ao estabelecimento correto.
+
+O webhook aplica rate limit persistente por IP confiável e rota antes de ler o
+corpo, limita o stream a 1 MiB e valida HMAC sobre os bytes originais. Depois da
+assinatura, o adaptador extrai chaves SHA-256 por receptor/contato. Head of line vale
+somente para streams sobrepostos; acima de 256 chaves, um wildcard do provider
+serializa o envelope sem truncar ou rejeitar eventos. Fragmento inválido é isolado e
+não elimina siblings válidos.
+
+Troca de tenant fecha a conversa anterior e move somente o inbound decisório para
+uma sucessora sem tenant. Código, opções e confirmação do novo estabelecimento ficam
+invisíveis ao tenant anterior. A atribuição ocorre apenas após a escolha do cliente.
+
+Retenção roda em lotes por rota interna autenticada. A policy privada define TTL de
+payload bruto, transporte e conteúdo conversacional, além de `legal_hold`. O job
+fecha sessões abandonadas, redige conteúdo antigo e remove filas terminais sem apagar
+o ledger técnico necessário para auditoria.
+
+O modelo admite número central compartilhado, número exclusivo, número próprio e
+vários números por tenant. Código de roteamento identifica contexto público e não
+autoriza operações. Provedores reais recebem referências de segredo; credenciais não
+entram no banco em texto simples nem no navegador.
+
+Decisão completa: [ADR 0001](adr/0001-whatsapp-cloud-api-channel.md). Ativação real:
+[checklist da Meta](whatsapp-meta-activation.md).
+
 ## Segurança
 
 - CSP e headers globais em `next.config.ts`.
@@ -116,6 +167,13 @@ a entrega necessária.
 - `0017`: lease, conclusão e retry da outbox.
 - `0018`: validação de contatos na reserva pública.
 - `0019`: publicação Realtime da agenda e dos bloqueios.
+- `0020`: fundação oficial do canal WhatsApp, inbox, outbox, conversa e RLS.
+- `0021`: leases e claims por provider, transições atômicas, lock de conversa,
+  status fora de ordem e dead letter.
+- `0022`: gateway transacional da agenda, consentimento web, templates e
+  notificações WhatsApp.
+- `0023`: rate limit persistente do webhook antes da autenticação do payload.
+- `0024`: policy de retenção, legal hold, sweep e redação/exclusão em lotes.
 
 Migrations aplicadas não são reescritas. Toda mudança futura recebe novo número,
 grants explícitos, teste e atualização de `DATABASE.md`.
@@ -127,7 +185,10 @@ Pipeline obrigatório:
 ```text
 lint -> typecheck -> unit -> build
                  -> Supabase local -> pgTAP -> integração -> E2E
-                 -> npm audit --audit-level=high
+                 -> npm audit --omit=dev --audit-level=high
 ```
+
+O audit completo também é monitorado. No estado atual, tanto a árvore de produção
+quanto a árvore completa registram zero vulnerabilidades conhecidas.
 
 Deploy, domínio, provedores, backups e alertas são configuração operacional externa.

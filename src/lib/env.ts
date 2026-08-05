@@ -1,4 +1,12 @@
 import { z } from "zod";
+import { resolveWhatsAppConfig } from "@/features/whatsapp/config";
+import { isWhatsAppRuntimeReady } from "@/features/whatsapp/readiness";
+
+const emptyAsUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
+
+const optionalWhatsAppString = (minimum: number, maximum = 4096) =>
+  z.preprocess(emptyAsUndefined, z.string().min(minimum).max(maximum).optional());
 
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
@@ -16,6 +24,32 @@ const serverEnvSchema = publicEnvSchema.extend({
   NOTIFICATION_MODE: z.enum(["dry-run", "webhook"]).optional(),
   NOTIFICATION_WEBHOOK_URL: z.url().optional(),
   NOTIFICATION_WEBHOOK_SECRET: z.string().min(20).optional(),
+  WHATSAPP_ENABLED: z.preprocess(
+    emptyAsUndefined,
+    z.enum(["true", "false"]).optional(),
+  ),
+  WHATSAPP_PROVIDER: z.preprocess(
+    emptyAsUndefined,
+    z.enum(["mock", "meta_cloud"]).optional(),
+  ),
+  WHATSAPP_GRAPH_API_VERSION: z.preprocess(
+    emptyAsUndefined,
+    z.string().regex(/^v[1-9][0-9]*[.][0-9]+$/).optional(),
+  ),
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalWhatsAppString(16, 512),
+  WHATSAPP_APP_SECRET: optionalWhatsAppString(16, 512),
+  WHATSAPP_PLATFORM_ACCESS_TOKEN: optionalWhatsAppString(20),
+  WHATSAPP_DEFAULT_PHONE_NUMBER_ID: optionalWhatsAppString(1, 128),
+  WHATSAPP_DEFAULT_WABA_ID: optionalWhatsAppString(1, 128),
+  WHATSAPP_SIMULATOR_ENABLED: z.preprocess(
+    emptyAsUndefined,
+    z.enum(["true", "false"]).optional(),
+  ),
+  WHATSAPP_EMBEDDED_SIGNUP_ENABLED: z.preprocess(
+    emptyAsUndefined,
+    z.enum(["true", "false"]).optional(),
+  ),
+  WHATSAPP_WORKER_SECRET: optionalWhatsAppString(32, 512),
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
@@ -34,6 +68,17 @@ function serverEnvValues() {
     NOTIFICATION_MODE: process.env.NOTIFICATION_MODE,
     NOTIFICATION_WEBHOOK_URL: process.env.NOTIFICATION_WEBHOOK_URL,
     NOTIFICATION_WEBHOOK_SECRET: process.env.NOTIFICATION_WEBHOOK_SECRET,
+    WHATSAPP_ENABLED: process.env.WHATSAPP_ENABLED,
+    WHATSAPP_PROVIDER: process.env.WHATSAPP_PROVIDER,
+    WHATSAPP_GRAPH_API_VERSION: process.env.WHATSAPP_GRAPH_API_VERSION,
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+    WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
+    WHATSAPP_PLATFORM_ACCESS_TOKEN: process.env.WHATSAPP_PLATFORM_ACCESS_TOKEN,
+    WHATSAPP_DEFAULT_PHONE_NUMBER_ID: process.env.WHATSAPP_DEFAULT_PHONE_NUMBER_ID,
+    WHATSAPP_DEFAULT_WABA_ID: process.env.WHATSAPP_DEFAULT_WABA_ID,
+    WHATSAPP_SIMULATOR_ENABLED: process.env.WHATSAPP_SIMULATOR_ENABLED,
+    WHATSAPP_EMBEDDED_SIGNUP_ENABLED: process.env.WHATSAPP_EMBEDDED_SIGNUP_ENABLED,
+    WHATSAPP_WORKER_SECRET: process.env.WHATSAPP_WORKER_SECRET,
   };
 }
 
@@ -75,20 +120,27 @@ export function isRuntimeReady(): boolean {
   if (!parsed.success || !parsed.data.BOOKING_TOKEN_PEPPER) return false;
 
   const env = parsed.data;
+  const whatsappConfig = resolveWhatsAppConfig(env, "production");
+  const whatsappRequiresNotifications =
+    whatsappConfig.enabled && whatsappConfig.provider === "meta_cloud";
   const notificationConfigured = Boolean(
-    env.SUPABASE_SERVICE_ROLE_KEY ||
-      env.NOTIFICATION_WORKER_SECRET ||
+    env.NOTIFICATION_WORKER_SECRET ||
       env.NOTIFICATION_MODE ||
       env.NOTIFICATION_WEBHOOK_URL ||
       env.NOTIFICATION_WEBHOOK_SECRET,
   );
-  if (!notificationConfigured) return true;
-
-  return Boolean(
-    env.SUPABASE_SERVICE_ROLE_KEY &&
+  if (
+    (notificationConfigured || whatsappRequiresNotifications) &&
+    !(
+      env.SUPABASE_SERVICE_ROLE_KEY &&
       env.NOTIFICATION_WORKER_SECRET &&
       env.NOTIFICATION_MODE === "webhook" &&
       env.NOTIFICATION_WEBHOOK_URL &&
-      env.NOTIFICATION_WEBHOOK_SECRET,
-  );
+      env.NOTIFICATION_WEBHOOK_SECRET
+    )
+  ) {
+    return false;
+  }
+
+  return isWhatsAppRuntimeReady(whatsappConfig);
 }

@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { normalizePhone } from "@/lib/phone";
 import { requestFingerprint } from "@/lib/rate-limit";
 import { isTrustedMutationRequest } from "@/lib/security/origin";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
@@ -25,8 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Informe um telefone válido com DDD." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_public_booking", {
+  const bookingInput = {
     p_tenant_slug: parsed.data.slug,
     p_location_id: parsed.data.locationId,
     p_service_ids: parsed.data.serviceIds,
@@ -39,7 +39,30 @@ export async function POST(request: NextRequest) {
     p_customer_notes: parsed.data.notes || null,
     p_idempotency_key: parsed.data.idempotencyKey,
     p_rate_limit_key: requestFingerprint(request, parsed.data.slug),
-  });
+  };
+  let result: { data: unknown; error: { code?: string; message: string } | null };
+  try {
+    if (parsed.data.whatsappConsent) {
+      const admin = createAdminClient();
+      result = await admin.rpc("create_public_booking_with_whatsapp_consent", {
+        ...bookingInput,
+        p_whatsapp_consent: true,
+        p_whatsapp_consent_evidence: {
+          policyId: "booking_transactional_updates",
+          policyVersion: "2026-07-31",
+          tenantSlug: parsed.data.slug,
+          textTemplate: "Quero receber pelo WhatsApp confirmações, lembretes e atualizações relacionadas aos meus agendamentos enviados por {estabelecimento}. Posso revogar essa autorização a qualquer momento.",
+        },
+      });
+    } else {
+      const supabase = await createClient();
+      result = await supabase.rpc("create_public_booking", bookingInput);
+    }
+  } catch {
+    return NextResponse.json({ error: "Serviço indisponível." }, { status: 503 });
+  }
+
+  const { data, error } = result;
 
   if (error) {
     const conflict = error.code === "23P01" || error.message.includes("slot_unavailable");

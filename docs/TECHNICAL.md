@@ -64,10 +64,25 @@ NOTIFICATION_WORKER_SECRET=at-least-32-random-characters
 NOTIFICATION_MODE=dry-run
 NOTIFICATION_WEBHOOK_URL=https://provider.example/events
 NOTIFICATION_WEBHOOK_SECRET=provider-secret
+WHATSAPP_ENABLED=false
+WHATSAPP_PROVIDER=mock
+WHATSAPP_GRAPH_API_VERSION=
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=
+WHATSAPP_APP_SECRET=
+WHATSAPP_PLATFORM_ACCESS_TOKEN=
+WHATSAPP_DEFAULT_PHONE_NUMBER_ID=
+WHATSAPP_DEFAULT_WABA_ID=
+WHATSAPP_SIMULATOR_ENABLED=true
+WHATSAPP_WORKER_SECRET=at-least-32-random-characters
 ```
 
 O modo `dry-run` é exclusivo do ambiente local. Produção exige `webhook`, URL e
 segredo do provedor. A URL do webhook deve usar HTTPS, sem credenciais embutidas.
+
+WhatsApp inicia desativado para tráfego real e usa provedor mock no desenvolvimento.
+Configuração do canal fica somente no servidor. App secret, verify token e access
+token não usam prefixo `NEXT_PUBLIC_`; componentes recebem apenas booleanos de
+prontidão e identificadores públicos. Produção deve recusar ativação parcial.
 
 `NEXT_PUBLIC_*` entra no bundle. `SUPABASE_SERVICE_ROLE_KEY`, peppers e segredos de
 worker/provedor nunca podem ser expostos ao navegador. Em produção, o pepper é
@@ -110,7 +125,7 @@ Princípios:
 
 ## 6. Banco de dados
 
-O schema ativo possui 30 tabelas, descritas em [DATABASE.md](DATABASE.md). A
+O schema ativo possui 45 tabelas, descritas em [DATABASE.md](DATABASE.md). A
 migration `0016_simplify_schema.sql` remove módulos sem fluxo ativo.
 
 Áreas principais:
@@ -181,11 +196,44 @@ sequenceDiagram
   usam `warn` nos marcos de retry.
 - Falha aplica backoff; depois de oito tentativas o evento exige intervenção.
 
+### WhatsApp
+
+- `/api/integrations/whatsapp/webhook` recebe eventos oficiais quando configurado.
+- Rate limit persistente usa o IP definido por `TRUSTED_CLIENT_IP_HEADER`; o proxy
+  deve substituir esse header e remover valores enviados pelo cliente.
+- Inbox deduplica, calcula ordenação por stream e persiste evento antes do
+  processamento assíncrono.
+- Roteador usa número receptor, código, sessão e histórico para resolver tenant.
+- Máquina de estados produz respostas abstratas de texto, botão, lista e template.
+  O contrato de Flow existe para evolução, mas o envio falha fechado enquanto a
+  integração estiver desativada.
+- Gateway reutiliza disponibilidade, criação, cancelamento e reagendamento existentes.
+- Outbox entrega pelo provedor mock ou Meta sem bloquear transação de reserva.
+- Falha técnica permanente, ou transitória a partir da penúltima tentativa, move o inbound já
+  persistido para `human_handoff` pela mesma transação de conversa e enfileira uma
+  resposta pública genérica. Falha anterior à criação da conversa permanece em dead
+  letter, pois ainda não existe contexto seguro para atribuir o atendimento.
+- Se o próprio handoff técnico continuar indisponível até a oitava tentativa, o
+  envelope também termina em dead letter e gera log de erro. A operação deve
+  restaurar o banco/lock, revisar o inbound pendente e reprocessar o evento; retries
+  infinitos são proibidos.
+- Simulador injeta eventos pelo mesmo pipeline e exige `platform_owner`.
+- `/api/internal/whatsapp/retention` exige bearer do worker e aplica um lote da
+  policy privada de TTL. Agende diariamente e repita enquanto houver contadores
+  maiores que zero; `legal_hold` interrompe o job sem alterar dados.
+
+Estado atual: estrutura e interface mock preparadas; conexão real permanece pendente.
+Nenhuma mensagem real deve ser enviada antes do checklist de ativação.
+
 ### LGPD
 
 - Exportação JSON exige sessão, papel `owner/admin` e acesso ao tenant.
-- Dados são lidos sob RLS e resposta usa `private, no-store`.
-- Anonimização permanece bloqueada até separar PII global por tenant com segurança.
+- Dados são lidos sob RLS, incluem rascunhos de conversa e usam `private, no-store`.
+- O WhatsApp redige payloads, mensagens, contextos e handoffs antigos em lotes e
+  elimina filas terminais conforme TTL. Contatos técnicos órfãos, inativos e sem
+  consentimento entram na mesma policy.
+- Exclusão integral da identidade global em `customers` continua exigindo análise
+  multi-tenant separada; a rotina WhatsApp não apaga reservas nem provas de opt-in.
 
 ## 9. Rotas
 
@@ -199,10 +247,16 @@ sequenceDiagram
 | `/app/{slug}/profissionais` | Equipe |
 | `/app/{slug}/relatorios` | Indicadores de 30 dias |
 | `/app/{slug}/configuracoes` | Checklist e publicação |
+| `/app/{slug}/whatsapp` | Configuração para gestores e fila humana para papéis operacionais |
+| `/app/platform/whatsapp` | Diagnóstico e handoffs sem tenant, restritos a `platform_owner` |
+| `/app/platform/whatsapp/simulator` | Eventos fictícios pelo provedor mock |
 | `/onboarding` | Criação inicial do estabelecimento |
 | `/auth/callback` | Troca de código por sessão |
 | `/api/app/{slug}/customers/{id}/export` | Exportação LGPD |
 | `/api/internal/notifications` | Consumo protegido da outbox |
+| `/api/internal/whatsapp/process-inbox` | Consumo protegido da inbox WhatsApp |
+| `/api/internal/whatsapp/process-outbox` | Entrega protegida da outbox WhatsApp |
+| `/api/internal/whatsapp/retention` | Sweep e retenção WhatsApp em lote |
 | `/api/health` | Estado mínimo sem segredos |
 
 ## 10. Testes e qualidade
@@ -226,9 +280,17 @@ npm run test:db
 O teste de concorrência exige um sucesso e um conflito quando duas reservas tentam
 ocupar o mesmo profissional e intervalo.
 
-GitHub Actions executa validação da aplicação, auditoria de dependências, Supabase
-local, pgTAP, concorrência e Playwright. O ambiente local sem Docker não executa a
-segunda parte.
+Testes WhatsApp usam telefones, códigos e payloads fictícios. Unitários cobrem
+providers mock/Meta, assinatura, rate limit, parsing parcial, estados, retries
+ambíguos, retenção e fronteiras por tenant. `supabase/tests/whatsapp.test.sql` cobre
+schema, grants, RLS, handoff e RPCs. O Playwright está configurado para reserva
+completa, histórico multi-tenant, handoff, idempotência e conflito de horário entre
+site e WhatsApp. Cenários dependentes do banco usam somente mock e não fazem chamadas
+externas. pgTAP e E2E não foram executados localmente por falta de Docker.
+
+O workflow GitHub Actions está configurado para executar validação da aplicação,
+auditoria de dependências de produção, Supabase local, pgTAP, concorrência e
+Playwright.
 
 ## 11. Deploy
 
