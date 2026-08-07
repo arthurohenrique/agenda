@@ -67,6 +67,11 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
 - Regex dentro de `check` só compila quando a primeira linha é inserida. Uma expressão
   inválida deixa a migration aplicar normalmente e só quebra no seed ou no primeiro
   insert, com `invalid regular expression` (SQLSTATE 2201B).
+- Os nomes declarados em `returns table (...)` viram variáveis plpgsql e colidem com
+  colunas homônimas (`column reference "x" is ambiguous`). A colisão só aparece em
+  tempo de execução, quando aquele caminho roda. Qualifique as referências; onde não
+  der — a inferência do `on conflict` não aceita nome qualificado — use
+  `#variable_conflict use_column` antes do `declare`.
 - Revise grants, policies, índices e comportamento de cascade em toda mudança.
 - Atualize `docs/DATABASE.md` quando o schema lógico mudar.
 - Seeds devem ser idempotentes e usar apenas identidades fictícias.

@@ -782,6 +782,12 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+-- Os nomes de `returns table` viram variáveis plpgsql, então `customer_id` colide
+-- com a coluna homônima na inferência do `on conflict`, que não aceita nome
+-- qualificado. Renomear a saída quebraria o contrato lido em resolve-tenant.ts,
+-- então a resolução passa a favorecer a coluna. Nenhuma variável `p_`/`v_` daqui
+-- tem nome de coluna, e as saídas nunca são lidas no corpo.
+#variable_conflict use_column
 declare
   v_contact public.whatsapp_contacts%rowtype;
   v_customer_id uuid;
