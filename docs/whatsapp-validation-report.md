@@ -1219,8 +1219,9 @@ Especificações existem em `tests/e2e/whatsapp-simulator.spec.ts`; **não execu
 * [x] Interfaces estão claramente definidas.
 * [x] As dependências adicionadas são justificadas — só `qrcode` + `@types/qrcode`.
 * [x] O código possui lint sem erro — `npm run lint` → exit 0.
-* [x] O código possui typecheck sem erro — `npx tsc --noEmit` → exit 0 **após** `npm install`
-  e `npm run build` (ver ressalva abaixo).
+* [x] O código possui typecheck sem erro — `npx tsc --noEmit` → exit 0, e o job
+  `application` da CI confirma em checkout limpo (ver ressalva abaixo sobre `.next`
+  obsoleto).
 * [x] O build de produção é concluído — `npm run build` OK.
 * [x] Testes unitários passam — 238/238.
 * [~] Testes de integração passam — não executados (Docker ausente).
@@ -1228,19 +1229,22 @@ Especificações existem em `tests/e2e/whatsapp-simulator.spec.ts`; **não execu
 * [~] Testes de RLS passam — não executados.
 * [~] Testes de concorrência passam — não executados.
 
-**Ressalva reproduzível:** em árvore limpa, `npm run typecheck` **falha antes** de
-`npm run build`, porque `typedRoutes: true` (`next.config.ts:32`) exige o manifesto de
-rotas gerado pelo build:
+**Ressalva de ambiente local, não de CI:** com um `.next/types` obsoleto na árvore de
+trabalho, `npm run typecheck` falha com um erro que não existe de verdade:
 
 ```
 src/components/whatsapp/tenant-whatsapp-panel.tsx(207,189): error TS2769: No overload matches this call.
     Type '"/app/platform/whatsapp/simulator"' is not assignable to type 'UrlObject | RouteImpl<"/app/platform/whatsapp/simulator">'.
 ```
 
-O script `validate` roda `lint && typecheck && test && build` — nessa ordem o typecheck
-só passa se `.next/types` já existir de um build anterior. Em CI limpa (`npm ci` →
-`npm run validate`) isso **quebra**. Recomendação: rodar `next build` antes do
-`typecheck`, ou usar `next typegen`.
+`typedRoutes: true` (`next.config.ts:32`) faz o build gravar o manifesto de rotas em
+`.next/types`. Um manifesto de build anterior, sem as rotas novas, é lido pelo `tsc` e
+rejeita rotas que existem. Basta rodar `npm run build` ou apagar `.next`.
+
+Verificado depois na CI: o job `application` executa `npm ci` seguido de
+`npm run validate` e **passou em todas as execuções**, inclusive as anteriores a estas
+correções. Em checkout limpo, sem `.next` algum, o typecheck não falha. A ordem
+`lint → typecheck → test → build` do script está correta.
 
 ---
 
@@ -1302,7 +1306,7 @@ Todos bloqueados pela ausência de conta/credenciais Meta.
 * [~] Logs e métricas mínimas existem. — logs sim; **métricas não**.
 * [x] Documentação está atualizada.
 * [x] Lint passa.
-* [~] Typecheck passa. — passa somente após `next build`; falha em árvore limpa.
+* [x] Typecheck passa. — confirmado pelo job `application` da CI em checkout limpo.
 * [x] Build passa.
 * [~] Testes passam. — unitários sim (238/238); integração/e2e/RLS não executados.
 * [x] O painel informa corretamente que a conexão real está pendente.
@@ -1482,11 +1486,11 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
    `npx supabase db reset`, `npm run test:db`, `RUN_DB_TESTS=1 npm run test:integration`,
    `RUN_E2E_DB=1 npm run test:e2e`.
 
-2. `npm run validate` QUEBRA EM ÁRVORE LIMPA — a ordem lint → typecheck → test → build
-   coloca o typecheck antes do build, mas `typedRoutes: true` só gera o manifesto de
-   rotas durante o build. Erro exato: TS2769 em tenant-whatsapp-panel.tsx:207.
-   Isso derruba o job `application` do CI em checkout limpo.
-   Ação: mover o build para antes do typecheck, ou adicionar `next typegen`.
+2. [RETIRADO] `npm run validate` não quebra em checkout limpo. Registrado antes como
+   bloqueante por causa de um TS2769 em tenant-whatsapp-panel.tsx:207, que vinha de um
+   `.next/types` obsoleto na máquina local, não da ordem do script. O job `application`
+   da CI roda `npm ci` seguido de `npm run validate` e passou em todas as execuções.
+   Localmente, basta `npm run build` ou apagar `.next`.
 
 3. node_modules desatualizado em relação ao package.json (faltavam `qrcode` e
    `@types/qrcode`). Não afeta CI (`npm ci`), mas quebra o ambiente local.

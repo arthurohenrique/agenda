@@ -127,10 +127,11 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
 
 ### Armadilhas conhecidas
 
-- **`npm run validate` quebra em árvore limpa.** `typedRoutes: true` só gera o manifesto
-  de rotas durante `next build`, mas o script roda `typecheck` antes do `build`. Se o
-  typecheck falhar com `TS2769 ... is not assignable to type 'UrlObject | RouteImpl<...>'`,
-  rode `npm run build` primeiro. Não "conserte" o erro trocando `Link` por `<a>`.
+- **`.next/types` obsoleto produz erro de typecheck falso.** `typedRoutes: true` faz o
+  build gravar o manifesto de rotas; um manifesto de build anterior rejeita rotas que já
+  existem, com `TS2769 ... is not assignable to type 'UrlObject | RouteImpl<...>'`. Rode
+  `npm run build` ou apague `.next`. Não "conserte" trocando `Link` por `<a>`. Em
+  checkout limpo o `npm run validate` passa — a CI confirma a cada execução.
 - Rodar `npm install` antes de auditar: o `package.json` pode estar à frente do
   `node_modules` local (já ocorreu com `qrcode`).
 - As migrations `0020`–`0024` nasceram sem nunca terem sido aplicadas: o job

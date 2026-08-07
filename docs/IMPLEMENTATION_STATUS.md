@@ -84,11 +84,12 @@ credenciais e número reais.
    As migrations foram editadas no lugar porque nunca chegaram a ser aplicadas.
 1. Suíte de banco não executada localmente (Docker ausente): sem ela, RLS,
    concorrência e criação real de reserva não estão comprovadas nesta máquina.
-2. `npm run validate` falha em checkout limpo. A ordem `lint → typecheck → test → build`
-   coloca o typecheck antes do build, mas `typedRoutes: true` (`next.config.ts`) só gera
-   o manifesto de rotas durante `next build`. Erro observado:
-   `src/components/whatsapp/tenant-whatsapp-panel.tsx(207,189): error TS2769`.
-   Correção sugerida: mover o build para antes do typecheck ou adicionar `next typegen`.
+2. **Retirado.** `npm run validate` não falha em checkout limpo. O TS2769 em
+   `tenant-whatsapp-panel.tsx:207` vinha de um `.next/types` obsoleto na máquina local,
+   não da ordem do script: `typedRoutes: true` faz o build gravar o manifesto de rotas, e
+   um manifesto antigo rejeita rotas que já existem. O job `application` da CI roda
+   `npm ci` e `npm run validate` e passou em todas as execuções. Localmente, rode
+   `npm run build` ou apague `.next`.
 
 ### Não bloqueantes de maior impacto
 
