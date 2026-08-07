@@ -40,9 +40,9 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 - 44 arquivos e 238 testes unitários: aprovados.
 - Build Next.js de produção: aprovado.
 - Consulta anônima real: tenants publicados visíveis; quatro tabelas privadas `401`.
-- Migrations atuais: 24, de `0001` a `0024`.
-- Suite pgTAP do WhatsApp: 165 asserções configuradas; execução local bloqueada
-  pela ausência de Docker/`psql`.
+- Migrations atuais: 25, de `0001` a `0025`.
+- Suite pgTAP do WhatsApp: 173 asserções, executadas e aprovadas na CI.
+- Integração e E2E: aprovados na CI, 51 cenários e2e sem flaky.
 - Lockfile e versões diretas: fixados em versões publicadas.
 - `npm audit --omit=dev --audit-level=high`: zero vulnerabilidades.
 - `npm audit --audit-level=high`: zero vulnerabilidades.
@@ -93,8 +93,9 @@ credenciais e número reais.
    no máximo 255. Regex em `check` só compila na primeira linha inserida, então a migration
    aplicava e a falha surgia no `seed.sql` como `invalid regular expression` (SQLSTATE 2201B).
    As migrations foram editadas no lugar porque nunca chegaram a ser aplicadas.
-1. Suíte de banco não executada localmente (Docker ausente): sem ela, RLS,
-   concorrência e criação real de reserva não estão comprovadas nesta máquina.
+1. **Resolvido.** A suíte de banco passou a executar na CI e está verde: RLS,
+   concorrência e criação real de reserva estão comprovadas. Localmente segue sem rodar,
+   por ausência de Docker.
 2. **Retirado.** `npm run validate` não falha em checkout limpo. O TS2769 em
    `tenant-whatsapp-panel.tsx:207` vinha de um `.next/types` obsoleto na máquina local,
    não da ordem do script: `typedRoutes: true` faz o build gravar o manifesto de rotas, e
@@ -113,7 +114,7 @@ credenciais e número reais.
 ## Pendências do proprietário
 
 1. Rotacionar segredo exposto e remover/trocar contas demo do projeto real.
-2. Revisar e aplicar migrations `0017–0024` no ambiente escolhido.
+2. Revisar e aplicar migrations `0017–0025` no ambiente escolhido.
 3. Configurar proxy confiável, Supabase Auth rate limits, CAPTCHA e MFA.
 4. Configurar webhook/e-mail, credenciais Meta e schedulers dos workers e retenção.
 5. Configurar Sentry, alertas, backups/PITR, domínio e deploy.
