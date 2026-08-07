@@ -73,6 +73,11 @@ credenciais e número reais.
 
 ### Bloqueantes registrados
 
+0. **Corrigido.** As migrations `0020`–`0024` nunca aplicaram: o job `database-and-e2e`
+   falhava em `npx supabase start` desde `33a7ad4`. PL/pgSQL rejeita variável `%rowtype`
+   dentro de lista `INTO` com vários itens, e o erro ocorre no `create function`,
+   abortando a migration inteira. Nove ocorrências corrigidas em `0021` e `0022`.
+   As migrations foram editadas no lugar porque nunca chegaram a ser aplicadas.
 1. Suíte de banco não executada localmente (Docker ausente): sem ela, RLS,
    concorrência e criação real de reserva não estão comprovadas nesta máquina.
 2. `npm run validate` falha em checkout limpo. A ordem `lint → typecheck → test → build`

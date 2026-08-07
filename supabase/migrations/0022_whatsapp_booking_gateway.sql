@@ -74,9 +74,12 @@ declare
   v_offset integer;
   v_available_at timestamptz;
   v_inserted integer := 0;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens; o registro
+  -- intermediário mantém a consulta única e o lock original.
+  v_row record;
 begin
-  select appointment, settings.metadata
-    into v_appointment, v_metadata
+  select appointment as appointment_row, settings.metadata as settings_metadata
+    into v_row
   from public.appointments appointment
   join public.tenant_whatsapp_settings settings
     on settings.tenant_id = appointment.tenant_id
@@ -85,6 +88,11 @@ begin
   where appointment.tenant_id = p_tenant_id
     and appointment.id = p_appointment_id
     and appointment.occupies_slot;
+
+  if found then
+    v_appointment := v_row.appointment_row;
+    v_metadata := v_row.settings_metadata;
+  end if;
 
   if v_appointment.id is null then
     return 0;
@@ -169,6 +177,8 @@ declare
   v_service_names text;
   v_count integer;
   v_item record;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens.
+  v_row record;
   v_value text;
   v_parameters jsonb := '[]'::jsonb;
 begin
@@ -197,10 +207,14 @@ begin
     raise exception using errcode = '22023', message = 'template_mapping_invalid';
   end if;
 
-  select appointment, tenant.name, customer.full_name, location.name, staff.name,
+  select appointment as appointment_row,
+         tenant.name as tenant_name,
+         customer.full_name as customer_name,
+         location.name as location_name,
+         staff.name as staff_name,
          coalesce(string_agg(service.name_snapshot, ', ' order by service.sort_order), '')
-    into v_appointment, v_tenant_name, v_customer_name, v_location_name,
-         v_staff_name, v_service_names
+           as service_names
+    into v_row
   from public.appointments appointment
   join public.tenants tenant on tenant.id = appointment.tenant_id
   join public.customer_tenants relation
@@ -218,6 +232,15 @@ begin
    and service.appointment_id = appointment.id
   where appointment.id = p_appointment_id
   group by appointment.id, tenant.name, customer.full_name, location.name, staff.name;
+
+  if found then
+    v_appointment := v_row.appointment_row;
+    v_tenant_name := v_row.tenant_name;
+    v_customer_name := v_row.customer_name;
+    v_location_name := v_row.location_name;
+    v_staff_name := v_row.staff_name;
+    v_service_names := v_row.service_names;
+  end if;
 
   if v_appointment.id is null then
     raise exception using errcode = 'P0002', message = 'template_appointment_not_found';
@@ -1153,9 +1176,11 @@ declare
   v_appointment public.appointments%rowtype;
   v_slug text;
   v_service_ids uuid[];
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens.
+  v_row record;
 begin
-  select appointment, tenant.slug::text
-    into v_appointment, v_slug
+  select appointment as appointment_row, tenant.slug::text as tenant_slug
+    into v_row
   from public.appointments appointment
   join public.customer_tenants relation
     on relation.tenant_id = appointment.tenant_id
@@ -1175,6 +1200,11 @@ begin
     and appointment.occupies_slot
     and appointment.starts_at > statement_timestamp() +
       make_interval(mins => business.cancellation_window_minutes);
+
+  if found then
+    v_appointment := v_row.appointment_row;
+    v_slug := v_row.tenant_slug;
+  end if;
 
   if v_appointment.id is null then
     raise exception using errcode = 'P0002', message = 'whatsapp_booking_not_found';
@@ -1215,6 +1245,8 @@ as $$
 declare
   v_appointment public.appointments%rowtype;
   v_window integer;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens.
+  v_row record;
 begin
   if p_idempotency_key is null or p_conversation_id is null or not exists (
     select 1
@@ -1227,8 +1259,9 @@ begin
     raise exception using errcode = '42501', message = 'whatsapp_channel_actor_mismatch';
   end if;
 
-  select appointment, business.cancellation_window_minutes
-    into v_appointment, v_window
+  select appointment as appointment_row,
+         business.cancellation_window_minutes as cancellation_window
+    into v_row
   from public.appointments appointment
   join public.customer_tenants relation
     on relation.tenant_id = appointment.tenant_id
@@ -1245,6 +1278,11 @@ begin
   where appointment.tenant_id = p_tenant_id
     and appointment.id = p_appointment_id
   for update of appointment;
+
+  if found then
+    v_appointment := v_row.appointment_row;
+    v_window := v_row.cancellation_window;
+  end if;
 
   if v_appointment.id is null then
     raise exception using errcode = 'P0002', message = 'whatsapp_booking_not_found';
@@ -1520,6 +1558,9 @@ declare
   v_contact public.whatsapp_contacts%rowtype;
   v_conversation public.whatsapp_conversations%rowtype;
   v_template public.whatsapp_template_definitions%rowtype;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens; o registro
+  -- intermediário é reaproveitado entre as consultas desta função.
+  v_row record;
   v_template_mapping jsonb;
   v_template_components jsonb;
   v_target_appointment_id uuid;
@@ -1601,8 +1642,11 @@ begin
     );
   end if;
 
-  select appointment, relation.customer_id, settings, phone
-    into v_appointment, v_customer_id, v_settings, v_phone
+  select appointment as appointment_row,
+         relation.customer_id as customer_id,
+         settings as settings_row,
+         phone as phone_row
+    into v_row
   from public.appointments appointment
   join public.customer_tenants relation
     on relation.tenant_id = appointment.tenant_id
@@ -1628,6 +1672,13 @@ begin
   where appointment.tenant_id = v_event.tenant_id
     and appointment.id = v_target_appointment_id
   for update of appointment;
+
+  if found then
+    v_appointment := v_row.appointment_row;
+    v_customer_id := v_row.customer_id;
+    v_settings := v_row.settings_row;
+    v_phone := v_row.phone_row;
+  end if;
 
   if v_appointment.id is null then
     return jsonb_build_object(
@@ -1786,8 +1837,9 @@ begin
     and v_conversation.service_window_expires_at > statement_timestamp();
 
   if not v_inside_window then
-    select definition, tenant_template.variable_mapping
-      into v_template, v_template_mapping
+    select definition as definition_row,
+           tenant_template.variable_mapping as variable_mapping
+      into v_row
     from public.tenant_whatsapp_templates tenant_template
     join public.whatsapp_template_definitions definition
       on definition.id = tenant_template.template_definition_id
@@ -1800,6 +1852,11 @@ begin
         (v_phone.provider = 'mock' and definition.status = 'local_draft')
       )
     limit 1;
+
+    if found then
+      v_template := v_row.definition_row;
+      v_template_mapping := v_row.variable_mapping;
+    end if;
 
     if v_template.id is null then
       return jsonb_build_object('status', 'blocked', 'reason', 'approved_template_missing');

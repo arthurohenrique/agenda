@@ -239,7 +239,12 @@ política entre canais.
 # 6. Migrations, constraints e índices
 
 * [x] Todas as alterações de banco estão em migrations versionadas — `0020`–`0024`.
-* [~] As migrations executam do zero sem erro. — **não executado localmente** (Docker ausente); CI roda `supabase db reset`.
+* [~] As migrations executam do zero sem erro. — **não executado localmente** (Docker ausente).
+  Verificado depois pela CI: em `33a7ad4` o job `database-and-e2e` falhava em
+  `npx supabase start`, com `0021` abortando no `create function`
+  `record_whatsapp_inbound_message`. Causa: PL/pgSQL proíbe variável de linha em lista
+  `INTO` com vários itens. Corrigido em `0021` e `0022` (9 ocorrências) — ver §44.
+  Continua `[~]` porque a aplicação bem-sucedida ainda depende de execução na CI.
 * [~] As migrations executam sobre o projeto existente sem destruir dados. — não executado localmente; as migrations são aditivas (nenhum `drop table`/`drop column` de tabela pré-existente; só `alter table ... add column`).
 * [x] Enums ou constraints impedem status inválidos — 20 enums criados em `0020`.
 * [x] Índices incluem `tenant_id` quando apropriado.
@@ -1446,6 +1451,22 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
 ## Pendências bloqueantes
 
 ```text
+0. [CORRIGIDO] MIGRATIONS NÃO APLICAVAM. Descoberto pela CI depois desta auditoria: o
+   job `database-and-e2e` falhava em `npx supabase start` desde 33a7ad4, e nenhuma
+   migration do canal jamais foi aplicada em lugar nenhum.
+   Erro: PL/pgSQL rejeita variável %rowtype dentro de lista INTO com vários itens
+   ("record or row variable cannot be part of multiple-item INTO list"). Como o erro
+   ocorre no CREATE FUNCTION, a migration inteira aborta.
+   9 ocorrências corrigidas: 3 em 0021 (record_whatsapp_inbound_message,
+   commit_whatsapp_conversation_transition, enqueue_whatsapp_response) e 6 em 0022
+   (schedule_whatsapp_appointment_reminders, build_whatsapp_template_components,
+   get_whatsapp_reschedule_slots, cancel_whatsapp_booking,
+   enqueue_whatsapp_appointment_notification — duas nesta última).
+   Correção mecânica: a linha vira coluna nomeada de um `record` intermediário e é
+   destrinchada sob `if found`, preservando consulta única, joins e `for update of`.
+   Migrations foram editadas no lugar, e não por uma 0025, porque nunca haviam sido
+   aplicadas: uma correção posterior deixaria 0021 abortando no apply mesmo assim.
+
 1. VALIDAÇÃO NÃO EXECUTADA — migrations, supabase test db (RLS, 165 asserções),
    testes de integração e e2e não rodaram nesta máquina por ausência de Docker.
    Sem isso NÃO é possível afirmar que RLS, concorrência, idempotência de webhook e

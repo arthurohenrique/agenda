@@ -58,6 +58,10 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
 - Uma nova tabela exige fluxo ativo, integridade própria e justificativa no PR.
 - Para metadados opcionais pequenos, prefira colunas `jsonb` já existentes.
 - Funções `security definer` devem usar `set search_path = ''` e nomes qualificados.
+- PL/pgSQL rejeita variável `%rowtype`/`record` dentro de lista `INTO` com vários
+  itens (`record or row variable cannot be part of multiple-item INTO list`). O erro
+  aparece no `CREATE FUNCTION`, então derruba a migration inteira. Selecione a linha
+  como coluna nomeada para um `record` intermediário e destrinche depois do `if found`.
 - Revise grants, policies, índices e comportamento de cascade em toda mudança.
 - Atualize `docs/DATABASE.md` quando o schema lógico mudar.
 - Seeds devem ser idempotentes e usar apenas identidades fictícias.
@@ -119,6 +123,10 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
   rode `npm run build` primeiro. Não "conserte" o erro trocando `Link` por `<a>`.
 - Rodar `npm install` antes de auditar: o `package.json` pode estar à frente do
   `node_modules` local (já ocorreu com `qrcode`).
+- As migrations `0020`–`0024` nasceram sem nunca terem sido aplicadas: o job
+  `database-and-e2e` falhava em `npx supabase start` desde `33a7ad4` por causa da regra
+  de lista `INTO` do PL/pgSQL. Ao adicionar função nova, confirme que a migration aplica
+  de fato; typecheck e teste unitário não cobrem nada disso.
 - Docker costuma estar ausente no ambiente local. `supabase test db`, integração e E2E
   não rodam aqui — declare explicitamente o que não foi executado (o CI cobre).
 - `secret_reference`, `payload` de webhook e `flow_token_hash` ficam **fora** dos

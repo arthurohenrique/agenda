@@ -868,6 +868,9 @@ declare
   v_existing public.whatsapp_messages%rowtype;
   v_message_id uuid;
   v_stale boolean;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens; o registro
+  -- intermediário mantém a consulta única e o lock original.
+  v_row record;
 begin
   begin
     v_provider := p_provider::public.whatsapp_provider;
@@ -888,12 +891,17 @@ begin
     v_provider::text || ':' || trim(p_provider_message_id), 0
   ));
 
-  select conversation, phone.provider
-    into v_conversation, v_phone_provider
+  select conversation as conversation_row, phone.provider as phone_provider
+    into v_row
   from public.whatsapp_conversations conversation
   join public.whatsapp_phone_numbers phone on phone.id = conversation.phone_number_id
   where conversation.id = p_conversation_id
   for update of conversation;
+
+  if found then
+    v_conversation := v_row.conversation_row;
+    v_phone_provider := v_row.phone_provider;
+  end if;
 
   if v_conversation.id is null
     or v_conversation.status in ('completed', 'expired', 'closed', 'failed') then
@@ -1050,6 +1058,8 @@ declare
   v_idempotency_key text;
   v_handoff_requested_by public.whatsapp_handoff_requester;
   v_handoff_reason text;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens.
+  v_row record;
 begin
   if p_expected_version < 1
     or char_length(trim(coalesce(p_state, ''))) not between 1 and 100
@@ -1069,13 +1079,21 @@ begin
     raise exception using errcode = '22023', message = 'invalid_handoff_acknowledgement';
   end if;
 
-  select conversation, phone.provider, contact.normalized_phone
-    into v_conversation, v_provider, v_contact_phone
+  select conversation as conversation_row,
+         phone.provider as phone_provider,
+         contact.normalized_phone as contact_phone
+    into v_row
   from public.whatsapp_conversations conversation
   join public.whatsapp_phone_numbers phone on phone.id = conversation.phone_number_id
   join public.whatsapp_contacts contact on contact.id = conversation.contact_id
   where conversation.id = p_conversation_id
   for update of conversation;
+
+  if found then
+    v_conversation := v_row.conversation_row;
+    v_provider := v_row.phone_provider;
+    v_contact_phone := v_row.contact_phone;
+  end if;
 
   if v_conversation.id is null or v_conversation.version <> p_expected_version then
     return false;
@@ -1345,6 +1363,8 @@ declare
   v_kind text;
   v_message_type public.whatsapp_message_type;
   v_message_id uuid;
+  -- plpgsql proíbe variável de linha em lista INTO com vários itens.
+  v_row record;
 begin
   if jsonb_typeof(coalesce(p_response, 'null'::jsonb)) <> 'object'
     or p_recipient !~ '^\+[1-9][0-9]{7,14}$'
@@ -1381,13 +1401,21 @@ begin
     raise exception using errcode = '22023', message = 'invalid_whatsapp_response_payload';
   end if;
 
-  select conversation, phone.provider, contact.normalized_phone
-    into v_conversation, v_provider, v_contact_phone
+  select conversation as conversation_row,
+         phone.provider as phone_provider,
+         contact.normalized_phone as contact_phone
+    into v_row
   from public.whatsapp_conversations conversation
   join public.whatsapp_phone_numbers phone on phone.id = conversation.phone_number_id
   join public.whatsapp_contacts contact on contact.id = conversation.contact_id
   where conversation.id = p_conversation_id
   for update of conversation;
+
+  if found then
+    v_conversation := v_row.conversation_row;
+    v_provider := v_row.phone_provider;
+    v_contact_phone := v_row.contact_phone;
+  end if;
 
   if v_conversation.id is null then
     raise exception using errcode = 'P0002', message = 'whatsapp_conversation_not_found';
