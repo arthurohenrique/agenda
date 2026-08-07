@@ -2169,7 +2169,11 @@ select ok(
 );
 reset role;
 
-set local role service_role;
+-- Este bloco manipula e inspeciona tabelas do núcleo como fixture: escreve em
+-- appointments e lê outbox_events, coisas que produção nunca faz por service_role,
+-- já que toda escrita passa por função security definer e a outbox só é lida via
+-- claim_outbox_events. Roda no papel da sessão; a cobertura de autorização do canal
+-- está nas seções `authenticated` e `anon`.
 update public.tenant_whatsapp_settings
 set preferred_phone_number_id = null
 where tenant_id = '20000000-0000-0000-0000-000000000001';
@@ -2699,7 +2703,8 @@ select throws_ok(
   'Template rejeita variable_mapping fora da lista segura'
 );
 
-set local role service_role;
+-- Mesmo caso do bloco anterior: fixture sobre appointments e leitura de
+-- outbox_events, fora do que service_role faz em produção.
 select is(
   (
     select public.enqueue_whatsapp_appointment_notification(
