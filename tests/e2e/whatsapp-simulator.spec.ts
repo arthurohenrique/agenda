@@ -165,6 +165,12 @@ async function completeBooking(
 
 test.describe("simulador WhatsApp com banco local", () => {
   test.skip(!databaseEnabled, "Requer Supabase local com seed.");
+  // Cada cenário encadeia cerca de oito idas ao servidor, e cada uma percorre webhook,
+  // worker de inbox e worker de outbox antes de a interface reabilitar o formulário. O
+  // orçamento padrão de 30s do Playwright não cobre isso no runner da CI, ainda mais com
+  // o servidor em modo dev, que compila as rotas sob demanda. O sintoma era um
+  // `locator.fill` estourando enquanto esperava o fieldset sair de `submitting`.
+  test.describe.configure({ timeout: 120_000 });
 
   test("recupera a falha transitória com a mesma instância do provider", async ({ page }, testInfo) => {
     await openSimulator(page, simulatedPhone(testInfo, "7"));
