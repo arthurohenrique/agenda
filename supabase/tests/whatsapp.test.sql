@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(168);
+select plan(171);
 
 select ok(
   not exists (
@@ -1685,23 +1685,37 @@ select ok(
   ),
   'Platform owner assume handoff de plataforma e atribui a conversa atomicamente'
 );
-select ok(
+-- Mutação e verificação em statements separados: dentro de um único `and`, a
+-- subconsulta não-correlacionada é planejada como InitPlan e pode ler o estado
+-- anterior à chamada da função.
+select is(
   (
-    select count(*) = 1
+    select count(*)::integer
     from public.whatsapp_handoffs
     where conversation_id = '95000000-0000-4000-8000-000000000003'
-  ) and public.resolve_whatsapp_handoff(
+  ),
+  1,
+  'Conversa sem tenant tem exatamente um handoff aberto'
+);
+select is(
+  public.resolve_whatsapp_handoff(
     (
       select id from public.whatsapp_handoffs
       where conversation_id = '95000000-0000-4000-8000-000000000003'
     ),
     'Resolvido pela plataforma',
     true
-  ) and (
-    select current_state = 'TENANT_SEARCH' and status = 'waiting_customer'
+  ),
+  true,
+  'Platform owner resolve handoff sem tenant'
+);
+select is(
+  (
+    select current_state || ':' || status::text
     from public.whatsapp_conversations
     where id = '95000000-0000-4000-8000-000000000003'
   ),
+  'TENANT_SEARCH:waiting_customer',
   'Somente platform owner lê e resolve handoff sem tenant'
 );
 reset role;
@@ -1770,7 +1784,7 @@ select * from public.record_whatsapp_inbound_message(
   null,
   statement_timestamp()
 );
-select ok(
+select is(
   (
     select restarted.tenant_id is null
       and restarted.current_state = 'TENANT_CONFIRMATION'
@@ -1791,11 +1805,17 @@ select ok(
       '[{"idempotency_key":"pgtap-switch-response-001","message_type":"text","content":{"text":"Encontramos o Salão da Ana. Digite 1 para confirmar."},"payload":{"kind":"text","body":"Encontramos o Salão da Ana. Digite 1 para confirmar."}}]',
       '+551199990001'
     ) restarted
-  ) and (
-    select status = 'closed'
+  ),
+  true,
+  'Restart por código de outro tenant devolve conversa de plataforma'
+);
+select is(
+  (
+    select status::text
     from public.whatsapp_conversations
     where id = '95000000-0000-4000-8000-000000000001'
   ),
+  'closed',
   'Código de outro tenant reinicia em conversa de plataforma antes da confirmação'
 );
 select ok(
