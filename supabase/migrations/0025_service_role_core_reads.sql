@@ -5,7 +5,9 @@ begin;
 -- núcleo diretamente por esse cliente:
 --
 --   src/features/whatsapp/application/booking-gateway.ts   tenants, services, staff,
---                                                          customer_tenants, appointments
+--                                                          customer_tenants, appointments,
+--                                                          locations e staff_services por
+--                                                          embed do PostgREST
 --   src/features/whatsapp/application/resolve-tenant.ts    tenants, customer_tenants
 --   src/features/notifications/worker.ts                   tenants, customers,
 --                                                          customer_tenants, appointments,
@@ -17,6 +19,10 @@ begin;
 -- receberam grant para `service_role` — ao contrário das tabelas do canal, que já o
 -- recebem na 0020. Sem isto toda leitura direta falha com `permission denied`, o que
 -- quebra o fluxo de agendamento pelo WhatsApp e o worker de notificações.
+--
+-- Uma tabela embutida num `select` do PostgREST — `locations!locations_tenant_id_fkey(...)`
+-- e `staff_services!inner(...)` — também é lida, e portanto também precisa do privilégio.
+-- Listar apenas as tabelas que aparecem em `.from(...)` deixa esses casos de fora.
 --
 -- Somente leitura: nenhum desses caminhos escreve por aqui. Toda escrita continua
 -- exclusivamente nas funções `security definer`.
@@ -30,7 +36,9 @@ begin
     'customers',
     'customer_tenants',
     'appointments',
-    'appointment_services'
+    'appointment_services',
+    'locations',
+    'staff_services'
   ] loop
     execute format('grant select on table public.%I to service_role', table_name);
   end loop;
