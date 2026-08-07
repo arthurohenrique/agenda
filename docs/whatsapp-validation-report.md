@@ -1467,6 +1467,14 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
    Migrations foram editadas no lugar, e não por uma 0025, porque nunca haviam sido
    aplicadas: uma correção posterior deixaria 0021 abortando no apply mesmo assim.
 
+   Com isso 0020–0024 passaram a aplicar, e a CI revelou um segundo defeito, no seed:
+   `invalid regular expression: invalid repetition count(s)` (SQLSTATE 2201B). Causa:
+   `whatsapp_template_definitions.name` usava `check (name ~ '^[a-z0-9_]{1,512}$')`,
+   mas `{m,n}` de regex do Postgres aceita no máximo 255. Regex em `check` só compila
+   na primeira linha inserida, então a migration aplicava e a quebra aparecia só no
+   `seed.sql`. Corrigido separando comprimento da expressão, preservando o limite de
+   512 caracteres da Meta.
+
 1. VALIDAÇÃO NÃO EXECUTADA — migrations, supabase test db (RLS, 165 asserções),
    testes de integração e e2e não rodaram nesta máquina por ausência de Docker.
    Sem isso NÃO é possível afirmar que RLS, concorrência, idempotência de webhook e

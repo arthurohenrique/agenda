@@ -77,6 +77,10 @@ credenciais e número reais.
    falhava em `npx supabase start` desde `33a7ad4`. PL/pgSQL rejeita variável `%rowtype`
    dentro de lista `INTO` com vários itens, e o erro ocorre no `create function`,
    abortando a migration inteira. Nove ocorrências corrigidas em `0021` e `0022`.
+   Com o apply destravado, a CI expôs um segundo defeito: `whatsapp_template_definitions.name`
+   usava `check (name ~ '^[a-z0-9_]{1,512}$')`, mas `{m,n}` de regex do Postgres aceita
+   no máximo 255. Regex em `check` só compila na primeira linha inserida, então a migration
+   aplicava e a falha surgia no `seed.sql` como `invalid regular expression` (SQLSTATE 2201B).
    As migrations foram editadas no lugar porque nunca chegaram a ser aplicadas.
 1. Suíte de banco não executada localmente (Docker ausente): sem ela, RLS,
    concorrência e criação real de reserva não estão comprovadas nesta máquina.

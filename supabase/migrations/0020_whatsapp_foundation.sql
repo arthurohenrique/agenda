@@ -503,7 +503,11 @@ create table public.whatsapp_template_definitions (
   external_template_id text check (
     external_template_id is null or char_length(external_template_id) between 1 and 200
   ),
-  name text not null check (name ~ '^[a-z0-9_]{1,512}$'),
+  -- O limite de 512 caracteres é da Meta, mas `{m,n}` de regex do Postgres aceita
+  -- no máximo 255. O comprimento fica fora da expressão para manter o limite real.
+  name text not null check (
+    name ~ '^[a-z0-9_]+$' and char_length(name) between 1 and 512
+  ),
   language text not null check (char_length(language) between 2 and 20),
   category text not null check (category in ('utility', 'authentication', 'marketing')),
   status text not null check (

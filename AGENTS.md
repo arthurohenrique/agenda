@@ -62,6 +62,11 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
   itens (`record or row variable cannot be part of multiple-item INTO list`). O erro
   aparece no `CREATE FUNCTION`, então derruba a migration inteira. Selecione a linha
   como coluna nomeada para um `record` intermediário e destrinche depois do `if found`.
+- Em regex do Postgres, `{m,n}` aceita no máximo 255. Para limite maior, tire o
+  comprimento da expressão: `col ~ '^[a-z0-9_]+$' and char_length(col) <= 512`.
+- Regex dentro de `check` só compila quando a primeira linha é inserida. Uma expressão
+  inválida deixa a migration aplicar normalmente e só quebra no seed ou no primeiro
+  insert, com `invalid regular expression` (SQLSTATE 2201B).
 - Revise grants, policies, índices e comportamento de cascade em toda mudança.
 - Atualize `docs/DATABASE.md` quando o schema lógico mudar.
 - Seeds devem ser idempotentes e usar apenas identidades fictícias.
