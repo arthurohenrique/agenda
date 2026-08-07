@@ -2576,11 +2576,13 @@ select is(
   3,
   'Reagendamento produz created, confirmed e rescheduled'
 );
+-- Agrega os motivos distintos em vez de reduzir a um booleano: quando falha, o TAP
+-- mostra qual motivo veio no lugar do esperado.
 select is(
   (
-    select bool_and(
-      public.enqueue_whatsapp_appointment_notification(event.id) ->> 'reason' =
-        'whatsapp_originated_operation'
+    select string_agg(
+      distinct public.enqueue_whatsapp_appointment_notification(event.id) ->> 'reason',
+      ','
     )
     from public.outbox_events event
     join pgtap_whatsapp_booking_result original on true
@@ -2593,7 +2595,7 @@ select is(
       and event.event_type = 'appointment.rescheduled'
     )
   ),
-  true,
+  'whatsapp_originated_operation',
   'Reagendamento suprime created, confirmed e rescheduled da resposta conversacional'
 );
 reset role;
@@ -2649,7 +2651,7 @@ select throws_ok(
       null,
       null,
       '99520000-0000-4000-8000-000000000004',
-      'pgtap-consent-null',
+      'pgtap-consent-null-0000000000000000',
       null,
       null
     )
@@ -2685,7 +2687,7 @@ select throws_ok(
       null,
       null,
       '99520000-0000-4000-8000-000000000000',
-      'pgtap-consent-invalid',
+      'pgtap-consent-invalid-0000000000000000',
       true,
       '{"policyId":"booking_transactional_updates","policyVersion":"2026-07-31","unexpected":"x"}'
     )
@@ -2708,7 +2710,7 @@ select lives_ok(
       null,
       null,
       '99520000-0000-4000-8000-000000000001',
-      'pgtap-consent-valid',
+      'pgtap-consent-valid-0000000000000000',
       true,
       '{"policyId":"booking_transactional_updates","policyVersion":"2026-07-31","tenantSlug":"forjado","textTemplate":"forjado"}'
     )
