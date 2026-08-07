@@ -312,6 +312,10 @@ test.describe("simulador WhatsApp com banco local", () => {
     await publicPage.getByRole("button", { name: /Corte 45 min/ }).click();
     const localDate = formatInTimeZone(startsAt, "America/Sao_Paulo", "yyyy-MM-dd");
     const localTime = formatInTimeZone(startsAt, "America/Sao_Paulo", "HH:mm");
+    // O site lista um profissional por horário, então sem escolher o mesmo da conversa
+    // a reserva cairia em outra agenda e não haveria conflito para o WhatsApp detectar.
+    await publicPage.getByRole("button", { name: "Prefere escolher profissional?" }).click();
+    await publicPage.getByRole("button", { name: staffName, exact: true }).click();
     await publicPage.getByLabel("Escolher outra data").fill(localDate);
     // Espera a lista recarregar antes de procurar o horário: a ausência do botão logo
     // após preencher a data pode ser só atraso da consulta de disponibilidade. Quando o

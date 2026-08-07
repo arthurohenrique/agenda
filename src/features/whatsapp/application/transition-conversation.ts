@@ -1379,7 +1379,20 @@ export async function transitionConversation(input: TransitionInput): Promise<{
       };
     }
   }
-  if (["atendente", "pessoa", "ajuda", "falar com alguem"].includes(command)) {
+  // A comparação é da mensagem inteira, de propósito: casar por substring faria um
+  // nome ou observação com "ajuda" cair em handoff. As variações naturais entram na
+  // lista em vez de a comparação ser afrouxada.
+  if ([
+    "atendente",
+    "pessoa",
+    "ajuda",
+    "falar com alguem",
+    "falar com atendente",
+    "quero falar com atendente",
+    "quero atendente",
+    "falar com humano",
+    "atendimento humano",
+  ].includes(command)) {
     return { conversation, transition: await handoffTransition(input, "customer_request") };
   }
   if (["menu", "inicio"].includes(command)) {
