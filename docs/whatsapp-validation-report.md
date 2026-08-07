@@ -1534,6 +1534,22 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
     docs/IMPLEMENTATION_STATUS.md:20. (§29, §30)
 
 13. Plano de rollback em docs/whatsapp-meta-activation.md:19 consta como "A preencher".
+
+14. Linhagem do restart é apagada pela primeira transição seguinte.
+    commit_whatsapp_conversation_transition faz `context = p_context`, substituição
+    integral, e o conversationContextSchema do app (Zod) não carrega
+    `previousConversationId` nem `restartReason`. Só que
+    commit_whatsapp_conversation_restart depende dessas chaves no caminho de replay:
+    quando o inbound já foi processado, ele procura a conversa sucessora por elas e,
+    não achando, levanta 40001 conversation_restart_replay_incomplete.
+    Efeito: um replay de webhook que chegue depois de o cliente ter avançado a conversa
+    não reconhece o trabalho já feito, tenta de novo com backoff e termina em dead
+    letter — mesmo tendo sido processado corretamente na primeira vez.
+    Descoberto ao investigar a suíte pgTAP, que localizava a sucessora pelas mesmas
+    chaves e quebrava depois da transição de confirmação. O teste foi corrigido para
+    usar a identidade estável de telefone e contato; a fragilidade do replay continua.
+    Correção provável: preservar as duas chaves na transição, em vez de substituir o
+    contexto inteiro.
 ```
 
 ## Itens dependentes da Meta

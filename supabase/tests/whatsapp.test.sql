@@ -2025,12 +2025,18 @@ select is(
     from public.record_whatsapp_inbound_message(
       'mock',
       'mock-pgtap-delayed-from-tenant-a-001',
+      -- A transição de confirmação substitui o contexto inteiro, então a linhagem
+      -- do restart já não está lá. A sucessora é localizada pela identidade estável
+      -- de telefone receptor e contato, que o restart preserva.
       (
-        select id from public.whatsapp_conversations
-        where context ->> 'previousConversationId' =
-          '95000000-0000-4000-8000-000000000001'
-          and context ->> 'restartReason' = 'tenant_change'
-        order by created_at desc
+        select successor.id
+        from public.whatsapp_conversations successor
+        join public.whatsapp_conversations origin
+          on origin.phone_number_id = successor.phone_number_id
+         and origin.contact_id = successor.contact_id
+        where origin.id = '95000000-0000-4000-8000-000000000001'
+          and successor.id <> origin.id
+        order by successor.created_at desc
         limit 1
       ),
       'text',

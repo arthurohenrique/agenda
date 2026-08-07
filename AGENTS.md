@@ -153,6 +153,11 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
 - `emergency_notice` não tem texto padrão: tenant vazio = nenhum aviso enviado.
 - Handoff não grava em `public.audit_logs`.
 - Anonimização LGPD global em `customers` continua pendente.
+- `commit_whatsapp_conversation_transition` substitui o contexto inteiro
+  (`context = p_context`), apagando `previousConversationId` e `restartReason`. Mas
+  `commit_whatsapp_conversation_restart` depende dessas chaves para reconhecer um
+  replay já processado; sem elas levanta `conversation_restart_replay_incomplete`
+  e o evento vai para dead letter apesar de o trabalho já ter sido feito.
 
 ### Ao alterar o módulo
 
