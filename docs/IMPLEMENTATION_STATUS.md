@@ -49,12 +49,17 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 
 ## Suíte completa executada
 
-A CI está verde em `39d1d91`: `application` e `database-and-e2e` passam. Migrations de
+A CI está verde em `511f8ff`: `application` e `database-and-e2e` passam. Migrations de
 `0001` a `0025` aplicam do zero, o seed carrega, a suíte pgTAP roda 173 asserções, a de
 integração passa e os 51 cenários e2e passam, sem flaky.
 
-Confirmada em três execuções consecutivas do mesmo commit. Destravar essa execução
-revelou sete defeitos de produção que lint, typecheck e teste unitário não alcançavam — dois deles fora do canal WhatsApp, no worker de notificações e
+Confirmada em três execuções consecutivas do mesmo commit. `39d1d91` chegou a passar
+antes, mas dois commits seguintes, só de documentação, falharam — a duplicação do
+transcript do simulador deixava estado residual que a retentativa do Playwright ora
+mascarava, ora não.
+
+Destravar essa execução revelou sete defeitos de produção que lint, typecheck e teste
+unitário não alcançavam, dois deles fora do canal WhatsApp, no worker de notificações e
 na agenda administrativa. Detalhe em [relatório](whatsapp-validation-report.md), seção
 "Execução da suíte — depois da auditoria".
 
@@ -66,7 +71,7 @@ localmente. O workflow de CI está configurado para executá-los em runner com D
 
 ## Auditoria do canal WhatsApp — 7 de agosto de 2026
 
-Checklist de 707 itens aplicado ao commit `33a7ad4`:
+Checklist de 809 itens aplicado ao commit `33a7ad4` e revisado depois da execução:
 [relatório completo](whatsapp-validation-report.md).
 
 | Marca | Itens |

@@ -1334,7 +1334,7 @@ pendência de verificação.
 ## Execução da suíte — depois da auditoria
 
 A auditoria foi entregue com a suíte de banco nunca executada. Ela passou a executar, e
-a CI está verde em `39d1d91`:
+a CI está verde e estável em `511f8ff`:
 
 ```
 JOB application: success
@@ -1551,7 +1551,7 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
    512 caracteres da Meta.
 
 1. [RESOLVIDO] VALIDAÇÃO NÃO EXECUTADA — a suíte passou a rodar na CI e está verde em
-   `39d1d91`: migrations de 0001 a 0025, seed, 173 asserções pgTAP, integração e 51
+   `511f8ff`: migrations de 0001 a 0025, seed, 173 asserções pgTAP, integração e 51
    cenários e2e. RLS, concorrência, idempotência de webhook e criação real de reserva
    estão cobertas. Ver a seção "Execução da suíte — depois da auditoria".
 
@@ -1659,7 +1659,8 @@ liberação de produção.  (27 itens — §42)
 * [x] **Estrutura aprovada para uso com provedor mock.**
 
   A condição registrada na entrega da auditoria — executar a suíte de banco — foi
-  cumprida. A CI está verde em `39d1d91`, com migrations aplicando do zero, seed
+  cumprida. A CI está verde em `511f8ff`, confirmada em três execuções consecutivas,
+  com migrations aplicando do zero, seed
   carregado, 173 asserções pgTAP, integração e 51 cenários e2e passando. Os seis
   defeitos de produção que a execução revelou estão corrigidos.
 
