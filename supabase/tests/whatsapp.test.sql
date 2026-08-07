@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(165);
+select plan(168);
 
 select ok(
   not exists (
@@ -1225,38 +1225,58 @@ select is(
   'pending',
   'Claim de outbox do simulador ignora item mais antigo de outra conversa'
 );
-select ok(
+-- Mutação e verificação ficam em statements separados: `ok()` sobre um `and` de
+-- chamada + subconsulta não informa qual lado falhou, e a ordem de avaliação da
+-- subconsulta em relação à função não é garantida.
+select is(
   public.defer_whatsapp_outbox(
     '99500000-0000-4000-8000-000000000012',
     'pgtap-simulator-outbox',
     'mock_transient_error',
     true
-  ) and (
-    select status = 'retry' and next_attempt_at <= statement_timestamp()
+  ),
+  true,
+  'Defer aceita o item reclamado pelo worker dono da lease'
+);
+select is(
+  (
+    select status::text || ':' || (next_attempt_at <= statement_timestamp())::text
     from public.whatsapp_outbox
     where id = '99500000-0000-4000-8000-000000000012'
   ),
+  'retry:true',
   'Retry do provider mock volta a ficar due imediatamente'
 );
-select ok(
+select is(
   (
-    select id = '99500000-0000-4000-8000-000000000012'
+    select id::text
     from public.claim_whatsapp_outbox_scoped(
       1,
       'pgtap-simulator-outbox-ambiguous',
       'mock',
       '95000000-0000-4000-8000-000000000003'
     )
-  ) and public.mark_whatsapp_outbox_delivery_ambiguous(
+  ),
+  '99500000-0000-4000-8000-000000000012',
+  'Item em retry é reclamado de novo pelo worker do simulador'
+);
+select is(
+  public.mark_whatsapp_outbox_delivery_ambiguous(
     '99500000-0000-4000-8000-000000000012',
     'pgtap-simulator-outbox-ambiguous',
     null,
     'network_timeout_after_post'
-  ) and (
-    select status = 'dead_letter' and provider_message_id is null
+  ),
+  true,
+  'Entrega ambígua é registrada pelo worker dono da lease'
+);
+select is(
+  (
+    select status::text || ':' || coalesce(provider_message_id, 'null')
     from public.whatsapp_outbox
     where id = '99500000-0000-4000-8000-000000000012'
   ),
+  'dead_letter:null',
   'Entrega ambígua sem ID externo vai para reconciliação sem reenvio'
 );
 
@@ -1475,8 +1495,11 @@ select throws_ok(
   'whatsapp_outbox_dispatch_in_progress',
   'Handoff aguarda resposta já reclamada sob lease válida'
 );
+-- Expira a lease sem violar whatsapp_outbox_lock_check, que exige
+-- locked_until > locked_at: as duas pontas recuam juntas.
 update public.whatsapp_outbox
-set locked_until = statement_timestamp() - interval '1 second'
+set locked_at = statement_timestamp() - interval '10 minutes',
+    locked_until = statement_timestamp() - interval '1 second'
 where id = '99500000-0000-4000-8000-000000000020';
 select is(
   public.commit_whatsapp_conversation_transition(
