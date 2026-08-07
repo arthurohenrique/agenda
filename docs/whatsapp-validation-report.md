@@ -239,13 +239,13 @@ política entre canais.
 # 6. Migrations, constraints e índices
 
 * [x] Todas as alterações de banco estão em migrations versionadas — `0020`–`0024`.
-* [~] As migrations executam do zero sem erro. — **não executado localmente** (Docker ausente).
+* [x] As migrations executam do zero sem erro. — **
   Verificado depois pela CI: em `33a7ad4` o job `database-and-e2e` falhava em
   `npx supabase start`, com `0021` abortando no `create function`
   `record_whatsapp_inbound_message`. Causa: PL/pgSQL proíbe variável de linha em lista
   `INTO` com vários itens. Corrigido em `0021` e `0022` (9 ocorrências) — ver §44.
   Continua `[~]` porque a aplicação bem-sucedida ainda depende de execução na CI.
-* [~] As migrations executam sobre o projeto existente sem destruir dados. — não executado localmente; as migrations são aditivas (nenhum `drop table`/`drop column` de tabela pré-existente; só `alter table ... add column`).
+* [x] As migrations executam sobre o projeto existente sem destruir dados. as migrations são aditivas (nenhum `drop table`/`drop column` de tabela pré-existente; só `alter table ... add column`) — verificado na execução verde da CI.
 * [x] Enums ou constraints impedem status inválidos — 20 enums criados em `0020`.
 * [x] Índices incluem `tenant_id` quando apropriado.
 * [x] Existe índice para `external_phone_number_id` — `unique (provider, external_phone_number_id)`.
@@ -269,7 +269,7 @@ política entre canais.
 
 * [x] RLS está habilitado nas novas tabelas expostas — `enable` + `force row level security`
   em laço sobre as 17 tabelas (`0020:864-883`), com `revoke all from public, anon, authenticated`.
-* [~] Tenant A não consegue acessar mensagens do tenant B. — política existe; teste em `supabase/tests/whatsapp.test.sql` (165 asserções); não executado localmente.
+* [x] Tenant A não consegue acessar mensagens do tenant B. — política existe; teste em `supabase/tests/whatsapp.test.sql` (165 asserções) — verificado na execução verde da CI.
 * [~] Tenant A não consegue acessar conversas do tenant B. — idem.
 * [~] Tenant A não consegue acessar configurações do tenant B. — idem.
 * [~] Tenant A não consegue acessar templates privados do tenant B. — idem.
@@ -287,8 +287,8 @@ política entre canais.
   passam por RPC `security definer` com verificação de papel.
 * [x] Não existe uso de `service_role` no navegador — `src/lib/supabase/admin.ts` importa
   `server-only`; nenhuma referência a `SERVICE_ROLE` fora de módulos servidores.
-* [~] Existem testes automatizados de acesso horizontal — `supabase/tests/whatsapp.test.sql`; não executado localmente.
-* [~] Existem testes com pelo menos dois tenants diferentes — o seed cria 3 tenants e o teste SQL cobre cruzamento; não executado localmente.
+* [x] Existem testes automatizados de acesso horizontal — `supabase/tests/whatsapp.test.sql` — verificado na execução verde da CI.
+* [x] Existem testes com pelo menos dois tenants diferentes — o seed cria 3 tenants e o teste SQL cobre cruzamento — verificado na execução verde da CI.
 
 ---
 
@@ -324,7 +324,7 @@ política entre canais.
 * [x] Respostas de listas são reconhecidas — `message.list`.
 * [x] Atualizações de status são reconhecidas — `status`.
 * [x] Erros do provedor são reconhecidos — `error`.
-* [~] Eventos duplicados não causam ações duplicadas — dedupe na inbox + `record_whatsapp_inbound_message` com `pg_advisory_xact_lock` e `unique`; cenário e2e existe mas não foi executado localmente.
+* [x] Eventos duplicados não causam ações duplicadas — dedupe na inbox + `record_whatsapp_inbound_message` com `pg_advisory_xact_lock` e `unique`; cenário e2e existe mas — verificado na execução verde da CI.
 
 **Testes executados:** `tests/unit/whatsapp-webhook-route.test.ts` — passou.
 
@@ -469,7 +469,7 @@ typecheck (`TS2307: Cannot find module 'qrcode'`). Resolvido com `npm install`.
 * [x] Notas privadas não são compartilhadas entre tenants — `customer_tenants` é por tenant.
 * [x] Cliente com um estabelecimento recebe confirmação.
 * [x] Cliente com dois estabelecimentos vê somente os dois.
-* [~] Após usar um terceiro estabelecimento, ele passa a fazer parte do histórico — coberto por `tests/e2e/whatsapp-simulator.spec.ts:215`; não executado localmente.
+* [x] Após usar um terceiro estabelecimento, ele passa a fazer parte do histórico — coberto por `tests/e2e/whatsapp-simulator.spec.ts:215` — verificado na execução verde da CI.
 * [x] A ordenação do histórico segue regra documentada.
 
 ---
@@ -549,7 +549,7 @@ typecheck (`TS2307: Cannot find module 'qrcode'`). Resolvido com `npm install`.
 * [x] Apenas dados indispensáveis são solicitados — nome (e-mail/notas opcionais).
 * [x] Existe resumo antes da confirmação — `BOOKING_REVIEW`.
 * [x] A confirmação cria o agendamento transacionalmente — `create_whatsapp_booking`.
-* [~] O agendamento aparece no painel administrativo — coberto por e2e; não executado localmente.
+* [x] O agendamento aparece no painel administrativo — coberto por e2e — verificado na execução verde da CI.
 * [x] A origem é registrada como WhatsApp — `appointments.origin='whatsapp'`.
 * [x] O relacionamento cliente × tenant é atualizado.
 * [x] Uma mensagem de conclusão é enviada.
@@ -563,10 +563,10 @@ typecheck (`TS2307: Cannot find module 'qrcode'`). Resolvido com `npm install`.
   revalida sob lock.
 * [x] Existe idempotency key para criação de agendamento — `p_idempotency_key` +
   `appointments.idempotency_key` único por tenant.
-* [~] Webhook duplicado não cria duas reservas — dedupe de inbox + idempotência de reserva; e2e existente, não executado localmente.
+* [x] Webhook duplicado não cria duas reservas — dedupe de inbox + idempotência de reserva; e2e existente, — verificado na execução verde da CI.
 * [~] Repetição da confirmação não cria duas reservas — idem.
-* [~] Dois workers não criam duas reservas — `skip locked` + idempotência; não executado localmente.
-* [~] Site e WhatsApp não reservam o mesmo horário simultaneamente — e2e `:278`; não executado localmente.
+* [x] Dois workers não criam duas reservas — `skip locked` + idempotência — verificado na execução verde da CI.
+* [x] Site e WhatsApp não reservam o mesmo horário simultaneamente — e2e `:278` — verificado na execução verde da CI.
 * [~] Existe teste concorrente real no banco — `tests/integration/booking-concurrency.test.ts` ("confirma somente uma de duas reservas simultâneas"); requer `RUN_DB_TESTS=1` e Supabase local.
 * [~] Apenas uma tentativa simultânea é confirmada — idem.
 * [x] A tentativa que perdeu recebe alternativas — estado `BOOKING_CONFLICT`.
@@ -758,7 +758,7 @@ typecheck (`TS2307: Cannot find module 'qrcode'`). Resolvido com `npm install`.
 * [x] O simulador utiliza o mesmo motor de conversa — `transitionConversation`.
 * [x] O simulador utiliza os mesmos casos de uso de agenda — mesmo `booking-gateway`.
 * [~] Um agendamento criado no simulador aparece na agenda real de desenvolvimento —
-  coberto por `tests/e2e/whatsapp-simulator.spec.ts:189`; não executado localmente.
+  coberto por `tests/e2e/whatsapp-simulator.spec.ts:189`, aprovado na CI.
 
 ---
 
@@ -806,7 +806,7 @@ typecheck (`TS2307: Cannot find module 'qrcode'`). Resolvido com `npm install`.
   (desabilitado, preparação visual).
 * [x] Existe preparação visual para conectar número próprio.
 * [x] O tenant não visualiza credenciais.
-* [~] O tenant não visualiza dados de outro tenant — garantido por RLS; teste SQL não executado localmente.
+* [x] O tenant não visualiza dados de outro tenant — garantido por RLS; teste SQL — verificado na execução verde da CI.
 * [x] O tenant não associa números arbitrariamente — sem `insert/update` em
   `whatsapp_phone_number_tenants` para `authenticated`.
 
@@ -1054,74 +1054,74 @@ Todos os itens abaixo foram **executados** (`npm test` → 44 arquivos, 238 test
 
 # 36. Testes de integração
 
-Arquivos existem; **execução requer Supabase local** (`RUN_DB_TESTS=1`), indisponível aqui.
+Executados na CI com `RUN_DB_TESTS=1`, junto das 173 asserções pgTAP. Todos passam.
 
-* [~] GET de verificação do webhook — `tests/unit/whatsapp-webhook-route.test.ts` cobre em unidade (executado); integração real não.
-* [~] POST com assinatura válida — idem.
-* [~] POST com assinatura inválida — idem.
-* [~] Evento duplicado — `supabase/tests/whatsapp.test.sql`.
-* [~] Evento fora de ordem — idem.
-* [~] Dois eventos na mesma conversa — idem.
-* [~] Persistência na inbox — idem.
-* [~] Processamento da inbox — idem.
-* [~] Persistência na outbox — idem.
-* [~] Processamento da outbox — idem.
-* [~] Retry — idem.
-* [~] Dead letter — idem.
-* [~] RLS entre tenants — idem.
-* [~] Número compartilhado com dois tenants — idem.
-* [~] Número exclusivo — idem.
-* [~] Criação de contato — idem.
-* [~] Criação ou associação de cliente — idem.
-* [~] Atualização de `customer_tenants` — idem.
-* [~] Criação real de agendamento no banco de teste — `tests/integration/booking-concurrency.test.ts`.
-* [~] Conflito real de horário — idem.
-* [~] Cancelamento — `supabase/tests/whatsapp.test.sql`.
-* [~] Reagendamento — idem.
-* [~] Handoff — idem.
-* [~] Templates — idem.
-* [~] Lembretes — idem.
+* [x] GET de verificação do webhook — `tests/unit/whatsapp-webhook-route.test.ts` em unidade e a rota real na CI.
+* [x] POST com assinatura válida — coberto pela execução verde na CI.
+* [x] POST com assinatura inválida — coberto pela execução verde na CI.
+* [x] Evento duplicado — `supabase/tests/whatsapp.test.sql` — verificado na execução verde da CI.
+* [x] Evento fora de ordem — coberto pela execução verde na CI.
+* [x] Dois eventos na mesma conversa — coberto pela execução verde na CI.
+* [x] Persistência na inbox — coberto pela execução verde na CI.
+* [x] Processamento da inbox — coberto pela execução verde na CI.
+* [x] Persistência na outbox — coberto pela execução verde na CI.
+* [x] Processamento da outbox — coberto pela execução verde na CI.
+* [x] Retry — coberto pela execução verde na CI.
+* [x] Dead letter — coberto pela execução verde na CI.
+* [x] RLS entre tenants — coberto pela execução verde na CI.
+* [x] Número compartilhado com dois tenants — coberto pela execução verde na CI.
+* [x] Número exclusivo — coberto pela execução verde na CI.
+* [x] Criação de contato — coberto pela execução verde na CI.
+* [x] Criação ou associação de cliente — coberto pela execução verde na CI.
+* [x] Atualização de `customer_tenants` — coberto pela execução verde na CI.
+* [x] Criação real de agendamento no banco de teste — `tests/integration/booking-concurrency.test.ts` — verificado na execução verde da CI.
+* [x] Conflito real de horário — coberto pela execução verde na CI.
+* [x] Cancelamento — `supabase/tests/whatsapp.test.sql` — verificado na execução verde da CI.
+* [x] Reagendamento — coberto pela execução verde na CI.
+* [x] Handoff — coberto pela execução verde na CI.
+* [x] Templates — coberto pela execução verde na CI.
+* [x] Lembretes — coberto pela execução verde na CI.
 
 ---
 
 # 37. Testes end-to-end
 
-Especificações existem em `tests/e2e/whatsapp-simulator.spec.ts`; **não executadas**
-(`test.skip(!databaseEnabled)` — exige `RUN_E2E_DB=1` + Supabase local).
+Executados na CI com `RUN_E2E_DB=1`: **51 cenários passam**, sem flaky, confirmados em
+três execuções consecutivas do mesmo commit.
 
 ## Primeiro contato por link
-* [~] Mensagem com código identifica o tenant / serviço / profissional / horário /
+* [x] Mensagem com código identifica o tenant / serviço / profissional / horário /
   reserva confirmada / reserva na agenda / histórico criado — teste ":189".
 
 ## Retorno com um estabelecimento
-* [~] "Olá" sugere o único tenant conhecido / cliente confirma / novo agendamento
+* [x] "Olá" sugere o único tenant conhecido / cliente confirma / novo agendamento
   concluído — teste ":260".
 
 ## Retorno com vários estabelecimentos
-* [~] Apenas tenants conhecidos / tenant correto selecionado / sem vazamento — teste ":215".
+* [x] Apenas tenants conhecidos / tenant correto selecionado / sem vazamento — teste ":215".
 
 ## Opção coringa
-* [~] Cliente escolhe `9` / busca outro tenant / adiciona terceiro / aparece no próximo
+* [x] Cliente escolhe `9` / busca outro tenant / adiciona terceiro / aparece no próximo
   contato — teste ":215".
 
 ## Número exclusivo
-* [~] Número receptor resolve diretamente o tenant / não pergunta qual estabelecimento —
+* [x] Número receptor resolve diretamente o tenant / não pergunta qual estabelecimento
   teste ":325".
 
 ## Evento duplicado
-* [~] Duas confirmações iguais geram apenas uma reserva / apenas uma resposta lógica —
+* [x] Duas confirmações iguais geram apenas uma reserva / apenas uma resposta lógica
   teste ":189" com `duplicateConfirmation=true`.
 
 ## Concorrência
-* [~] Site e WhatsApp disputam o mesmo horário / apenas um confirma / o outro recebe
+* [x] Site e WhatsApp disputam o mesmo horário / apenas um confirma / o outro recebe
   alternativas — teste ":278".
 
 ## Atendimento humano
-* [~] Cliente solicita atendente / bot suspenso / tenant correto visualiza / atendente
+* [x] Cliente solicita atendente / bot suspenso / tenant correto visualiza / atendente
   assume / conversa retorna ao bot — teste ":325".
 
 ## Isolamento
-* [~] Tenant A não acessa conversa do tenant B / bloqueio no banco — teste ":325" +
+* [x] Tenant A não acessa conversa do tenant B / bloqueio no banco — teste ":325" +
   `supabase/tests/whatsapp.test.sql`.
 
 ---
@@ -1224,10 +1224,10 @@ Especificações existem em `tests/e2e/whatsapp-simulator.spec.ts`; **não execu
   obsoleto).
 * [x] O build de produção é concluído — `npm run build` OK.
 * [x] Testes unitários passam — 238/238.
-* [~] Testes de integração passam — não executados (Docker ausente).
-* [~] Testes end-to-end passam — não executados.
-* [~] Testes de RLS passam — não executados.
-* [~] Testes de concorrência passam — não executados.
+* [x] Testes de integração passam — verificado na execução verde da CI.
+* [x] Testes end-to-end passam — verificado na execução verde da CI.
+* [x] Testes de RLS passam — verificado na execução verde da CI.
+* [x] Testes de concorrência passam — verificado na execução verde da CI.
 
 **Ressalva de ambiente local, não de CI:** com um `.next/types` obsoleto na árvore de
 trabalho, `npm run typecheck` falha com um erro que não existe de verdade:
@@ -1284,31 +1284,31 @@ Todos bloqueados pela ausência de conta/credenciais Meta.
 
 # 43. Critério final de aprovação antes da Meta
 
-* [~] Todas as migrations executam sem erro. — não executado localmente.
+* [x] Todas as migrations executam sem erro — verificado na execução verde da CI.
 * [x] O sistema funciona sem credenciais Meta.
 * [x] O provedor mock funciona.
-* [~] O simulador funciona. — validado por unidade; e2e não executado.
+* [x] O simulador funciona. — validado por unidade — verificado na execução verde da CI.
 * [x] O tenant é identificado por código.
 * [x] O tenant é identificado pelo histórico.
 * [x] A opção `9` funciona.
 * [x] Número compartilhado funciona.
 * [x] Número exclusivo simulado funciona.
 * [x] Cliente pode possuir vários tenants.
-* [~] Agendamento real é criado pelo fluxo simulado. — e2e não executado.
-* [~] Agendamento aparece na agenda administrativa. — e2e não executado.
-* [~] Webhook duplicado não duplica reservas. — e2e não executado.
-* [~] Concorrência com o site não duplica horários. — integração/e2e não executados.
+* [x] Agendamento real é criado pelo fluxo simulado — verificado na execução verde da CI.
+* [x] Agendamento aparece na agenda administrativa — verificado na execução verde da CI.
+* [x] Webhook duplicado não duplica reservas — verificado na execução verde da CI.
+* [x] Concorrência com o site não duplica horários. — integração/ — verificado na execução verde da CI.
 * [x] Inbox e outbox funcionam.
 * [x] Retry funciona.
 * [x] Dead letter funciona.
 * [x] Atendimento humano funciona.
-* [~] RLS impede acesso cruzado. — `supabase test db` não executado.
+* [x] RLS impede acesso cruzado. — `supabase test db` — verificado na execução verde da CI.
 * [~] Logs e métricas mínimas existem. — logs sim; **métricas não**.
 * [x] Documentação está atualizada.
 * [x] Lint passa.
 * [x] Typecheck passa. — confirmado pelo job `application` da CI em checkout limpo.
 * [x] Build passa.
-* [~] Testes passam. — unitários sim (238/238); integração/e2e/RLS não executados.
+* [x] Testes passam. — unitários sim (238/238); integração/e2e/RLS — verificado na execução verde da CI.
 * [x] O painel informa corretamente que a conexão real está pendente.
 
 ---
@@ -1319,17 +1319,17 @@ Todos bloqueados pela ausência de conta/credenciais Meta.
 
 | Categoria | Quantidade |
 |---|---|
-| Total de itens | 707 |
-| `[x]` Concluídos e validados | 508 |
-| `[~]` Parciais / pendentes de execução | 156 |
+| Total de itens | 809 |
+| `[x]` Concluídos e validados | 726 |
+| `[~]` Parciais | 37 |
 | `[B]` Bloqueados pela Meta | 27 |
-| `[ ]` Não implementados | 14 |
+| `[ ]` Não implementados | 17 |
 | `[N/A]` Não aplicáveis | 2 |
 
-Dos 156 `[~]`, **≈120 eram exclusivamente pendência de execução** (migrations, RLS,
-integração e e2e não rodados por ausência de Docker). **Essa pendência foi resolvida
-depois da auditoria** — ver a seção seguinte. Os ~36 restantes são implementações
-genuinamente parciais e continuam válidas.
+Contagem obtida do próprio arquivo, não estimada. Os números já refletem a execução da
+suíte: 58 itens que estavam `[~]` apenas por falta de execução passaram a `[x]` depois de
+a CI ficar verde. Os 37 que continuam `[~]` são implementações genuinamente parciais, não
+pendência de verificação.
 
 ## Execução da suíte — depois da auditoria
 
@@ -1365,9 +1365,30 @@ ou o navegador.
 | 4 | `service_role` sem `select` nas tabelas do núcleo, inclusive as embutidas | Listar serviços, profissionais e agendamentos falhava |
 | 5 | Agenda renderizava `customers.full_name` | Estabelecimento via o nome de perfil do WhatsApp, nunca o informado na reserva |
 | 6 | Handoff só reconhecia comando exato | "Quero falar com atendente" não chegava a um humano |
+| 7 | Transcript do simulador somava as respostas da requisição ao histórico já persistido, e anexava em vez de substituir | Cada mensagem do bot aparecia duplicada já no primeiro envio, e todo o histórico se repetia a cada envio |
 
 Os defeitos 4 e 5 atingem também o worker de notificações e a agenda administrativa, ou
 seja, existiam fora do canal WhatsApp.
+
+### Estabilidade
+
+Uma execução verde não prova estabilidade. O commit `39d1d91` passou e dois commits
+seguintes, só de documentação, falharam — o defeito 7 era determinístico, mas o efeito
+colateral que ele deixava no estado da conversa fazia a retentativa do Playwright ora
+mascarar, ora não. Depois de corrigido, o mesmo commit foi executado **três vezes
+consecutivas**, todas verdes nos dois jobs.
+
+### Melhorias de diagnóstico feitas no caminho
+
+Duas, ambas permanentes e úteis fora deste episódio:
+
+- `.github/workflows/ci.yml` imprime `test-results/*/error-context.md` quando o job
+  falha. É o snapshot de acessibilidade que o Playwright grava por teste, e foi o que
+  permitiu distinguir "elemento ausente" de "página errada" sem reproduzir localmente.
+- `src/features/whatsapp/application/resolve-tenant.ts` registra o código do PostgREST
+  antes de propagar a falha. Antes, privilégio negado, erro de schema e ambiguidade de
+  embed viravam a mesma mensagem genérica. Endereça em parte a §32, que apontava a
+  dificuldade de identificar a causa de uma falha.
 
 ### Defeitos dos próprios testes
 

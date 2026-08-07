@@ -200,3 +200,7 @@ usar as colunas `jsonb` já existentes nas entidades principais.
   recebimento antes do processamento do webhook.
 - `0024_whatsapp_retention.sql`: adiciona policy privada versionada, `legal_hold`,
   encerramento de sessões abandonadas e redação/exclusão em lotes.
+- `0025_service_role_core_reads.sql`: concede `select` ao `service_role` nas tabelas do
+  núcleo lidas pelo cliente admin do servidor, inclusive as que entram por embed do
+  PostgREST. Sem isso o gateway do WhatsApp e o worker de notificações falham com
+  `permission denied`.

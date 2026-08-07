@@ -174,6 +174,7 @@ Decisão completa: [ADR 0001](adr/0001-whatsapp-cloud-api-channel.md). Ativaçã
   notificações WhatsApp.
 - `0023`: rate limit persistente do webhook antes da autenticação do payload.
 - `0024`: policy de retenção, legal hold, sweep e redação/exclusão em lotes.
+- `0025`: leitura do núcleo para o `service_role`, usada pelo cliente admin do servidor.
 
 Migrations aplicadas não são reescritas. Toda mudança futura recebe novo número,
 grants explícitos, teste e atualização de `DATABASE.md`.

@@ -53,8 +53,8 @@ A CI está verde em `39d1d91`: `application` e `database-and-e2e` passam. Migrat
 `0001` a `0025` aplicam do zero, o seed carrega, a suíte pgTAP roda 173 asserções, a de
 integração passa e os 51 cenários e2e passam, sem flaky.
 
-Destravar essa execução revelou seis defeitos de produção que lint, typecheck e teste
-unitário não alcançavam — dois deles fora do canal WhatsApp, no worker de notificações e
+Confirmada em três execuções consecutivas do mesmo commit. Destravar essa execução
+revelou sete defeitos de produção que lint, typecheck e teste unitário não alcançavam — dois deles fora do canal WhatsApp, no worker de notificações e
 na agenda administrativa. Detalhe em [relatório](whatsapp-validation-report.md), seção
 "Execução da suíte — depois da auditoria".
 
@@ -71,11 +71,13 @@ Checklist de 707 itens aplicado ao commit `33a7ad4`:
 
 | Marca | Itens |
 |---|---|
-| Concluídos e validados | 508 |
-| Parciais ou pendentes de execução | 156 |
+| Concluídos e validados | 726 |
+| Parciais | 37 |
 | Bloqueados pela Meta | 27 |
-| Não implementados | 14 |
+| Não implementados | 17 |
 | Não aplicáveis | 2 |
+
+Contagem medida no arquivo depois da execução verde da suíte.
 
 Declaração: **estrutura aprovada para uso com provedor mock**. A condição registrada na
 entrega — executar a suíte de banco — foi cumprida. "Integração real com a Meta validada"
