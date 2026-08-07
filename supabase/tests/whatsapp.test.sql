@@ -2576,12 +2576,15 @@ select is(
   3,
   'Reagendamento produz created, confirmed e rescheduled'
 );
--- Agrega os motivos distintos em vez de reduzir a um booleano: quando falha, o TAP
--- mostra qual motivo veio no lugar do esperado.
+-- A asserção é sobre o status, não sobre o rótulo do motivo: os três eventos precisam
+-- ser suprimidos, e a função tem mais de um motivo legítimo para isso. O created do
+-- appointment reagendado sai como reschedule_created_suppressed, e o confirmed e o
+-- rescheduled como whatsapp_originated_operation. Agregar os status distintos mantém
+-- o diagnóstico útil sem prender o teste a um rótulo interno.
 select is(
   (
     select string_agg(
-      distinct public.enqueue_whatsapp_appointment_notification(event.id) ->> 'reason',
+      distinct public.enqueue_whatsapp_appointment_notification(event.id) ->> 'status',
       ','
     )
     from public.outbox_events event
@@ -2595,7 +2598,7 @@ select is(
       and event.event_type = 'appointment.rescheduled'
     )
   ),
-  'whatsapp_originated_operation',
+  'skipped',
   'Reagendamento suprime created, confirmed e rescheduled da resposta conversacional'
 );
 reset role;
