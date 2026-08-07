@@ -2124,7 +2124,7 @@ select ok(
     select expired.tenant_id is null
       and expired.current_state = 'START'
       and expired.context ->> 'restartReason' = 'session_expired'
-      and jsonb_object_length(expired.context) = 2
+      and (select count(*) from jsonb_object_keys(expired.context)) = 2
     from public.expire_whatsapp_conversation(
       (
         select id
