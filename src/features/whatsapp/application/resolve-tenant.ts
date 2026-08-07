@@ -4,7 +4,18 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { PersistedConversation } from "../domain/conversation";
 import type { WhatsAppContact, WhatsAppPhoneNumber } from "../infrastructure/repositories/channel-repository";
+import { logger } from "@/lib/observability/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+// O código do PostgREST é o único dado que identifica a causa de uma consulta
+// recusada. Sem ele, uma falha de privilégio fica indistinguível de erro de schema.
+function reportQueryFailure(operation: string, error: { code?: string } | null) {
+  logger.warn("whatsapp_tenant_query_failed", {
+    operation,
+    errorCode: error?.code ?? "unknown",
+    result: "rejected",
+  });
+}
 
 export interface TenantCandidate {
   id: string;
@@ -125,7 +136,10 @@ async function loadTenant(
     .eq("tenant_whatsapp_settings.enabled", true)
     .eq("tenant_whatsapp_settings.booking_enabled", true)
     .maybeSingle();
-  if (error) throw new Error("tenant_query_failed");
+  if (error) {
+    reportQueryFailure("load_tenant", error);
+    throw new Error("tenant_query_failed");
+  }
   if (!data) return null;
   return mapTenant(data);
 }
@@ -196,7 +210,10 @@ async function historyTenants(
     .order("last_visit_at", { ascending: false, nullsFirst: false })
     .order("appointments_count", { ascending: false })
     .limit(20);
-  if (error) throw new Error("tenant_history_query_failed");
+  if (error) {
+    reportQueryFailure("tenant_history", error);
+    throw new Error("tenant_history_query_failed");
+  }
   const schema = z.array(z.object({ tenants: tenantSchema }));
   return schema.parse(data ?? []).map((row) => mapTenant(row.tenants));
 }
@@ -251,7 +268,10 @@ export async function searchWhatsAppTenants(input: {
     .eq("tenant_whatsapp_settings.booking_enabled", true)
     .order("name")
     .limit(100);
-  if (error) throw new Error("tenant_search_failed");
+  if (error) {
+    reportQueryFailure("tenant_search", error);
+    throw new Error("tenant_search_failed");
+  }
   return z
     .array(tenantSchema.passthrough())
     .parse(data ?? [])
