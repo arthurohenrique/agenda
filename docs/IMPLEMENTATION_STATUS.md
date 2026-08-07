@@ -15,7 +15,7 @@ Data de referência: 31 de julho de 2026.
 | Agenda, bloqueios e status | Implementado |
 | Realtime e relatórios | Implementado básico |
 | Notificações | Worker implementado; provedor externo pendente |
-| WhatsApp | Pipeline mock, inbox/outbox, roteamento, agenda, handoff, simulador e retenção implementados; Meta real pendente |
+| WhatsApp | Pipeline mock, inbox/outbox, roteamento, agenda, handoff, simulador e retenção implementados; Meta real pendente. Auditoria item a item: [relatório](whatsapp-validation-report.md) |
 | Exportação LGPD | Implementada por tenant |
 | Anonimização LGPD | Contatos técnicos órfãos do WhatsApp entram na retenção; identidade global em `customers` permanece pendente |
 | Observabilidade | Logger e health check; provedor externo pendente |
@@ -52,6 +52,42 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 Docker e `psql` não estão instalados neste ambiente. Reset do Supabase, pgTAP,
 integração com `RUN_DB_TESTS=1` e E2E com `RUN_E2E_DB=1` não foram executados
 localmente. O workflow de CI está configurado para executá-los em runner com Docker.
+
+## Auditoria do canal WhatsApp — 7 de agosto de 2026
+
+Checklist de 707 itens aplicado ao commit `33a7ad4`:
+[relatório completo](whatsapp-validation-report.md).
+
+| Marca | Itens |
+|---|---|
+| Concluídos e validados | 508 |
+| Parciais ou pendentes de execução | 156 |
+| Bloqueados pela Meta | 27 |
+| Não implementados | 14 |
+| Não aplicáveis | 2 |
+
+Declaração: **estrutura parcialmente aprovada, com pendências não bloqueantes**,
+condicionada à execução da suíte de banco. "Integração real com a Meta validada"
+permanece desmarcada: não há evidência de envio, recebimento, status ou webhook com
+credenciais e número reais.
+
+### Bloqueantes registrados
+
+1. Suíte de banco não executada localmente (Docker ausente): sem ela, RLS,
+   concorrência e criação real de reserva não estão comprovadas nesta máquina.
+2. `npm run validate` falha em checkout limpo. A ordem `lint → typecheck → test → build`
+   coloca o typecheck antes do build, mas `typedRoutes: true` (`next.config.ts`) só gera
+   o manifesto de rotas durante `next build`. Erro observado:
+   `src/components/whatsapp/tenant-whatsapp-panel.tsx(207,189): error TS2769`.
+   Correção sugerida: mover o build para antes do typecheck ou adicionar `next typegen`.
+
+### Não bloqueantes de maior impacto
+
+- Dead letter observável, porém sem reprocessamento.
+- Nenhuma métrica emitida; só logs estruturados. Alertas por configurar.
+- Política de cancelamento duplicada entre `cancel_whatsapp_booking` e
+  `cancel_public_booking`.
+- Embedded Signup e WhatsApp Flows existem como estrutura, sem implementação ativa.
 
 ## Pendências do proprietário
 

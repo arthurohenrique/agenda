@@ -97,6 +97,7 @@ flowchart LR
 | [Auditoria Vibe Check](security/AUDIT_SUMMARY.md) | Segurança |
 | [ADR do WhatsApp](docs/adr/0001-whatsapp-cloud-api-channel.md) | Engenharia e segurança |
 | [Ativação da Meta](docs/whatsapp-meta-activation.md) | Operação |
+| [Auditoria do canal WhatsApp](docs/whatsapp-validation-report.md) | Engenharia, QA e agentes de IA |
 
 ## Stack
 
