@@ -37,10 +37,6 @@ function messageBody(message: WhatsAppSimulatorResponse["messages"][number]) {
   return message.body ?? message.text ?? message.content ?? message.kind ?? "Mensagem processada";
 }
 
-function responseBody(response: WhatsAppSimulatorResponse["responses"][number]) {
-  return response.body ?? response.text ?? `Resposta ${response.kind}`;
-}
-
 export function WhatsAppSimulator({
   enabled,
   phoneNumbers,
@@ -115,26 +111,17 @@ export function WhatsAppSimulator({
 
       setResult(output.data);
       setConversationId(output.data.conversation?.id ?? conversationId);
-      const inbound: TranscriptEntry = {
-        id: crypto.randomUUID(),
-        direction: "inbound",
-        body: messagePreview,
-      };
-      const outboundMessages: TranscriptEntry[] = [
-        ...output.data.responses.map((item) => ({
-          id: crypto.randomUUID(),
-          direction: "outbound" as const,
-          body: responseBody(item),
+      // O histórico persistido da conversa é a fonte única: ele já contém o inbound
+      // recém-processado e as respostas do bot. Somar a ele o que o provider enviou
+      // nesta requisição duplicava cada mensagem, e anexar ao que já estava na tela
+      // repetia todo o histórico a cada envio.
+      setTranscript(
+        output.data.messages.map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          direction: item.direction === "inbound" ? ("inbound" as const) : ("outbound" as const),
+          body: messageBody(item),
         })),
-        ...output.data.messages
-          .filter((item) => item.direction !== "inbound")
-          .map((item) => ({
-            id: item.id ?? crypto.randomUUID(),
-            direction: "outbound" as const,
-            body: messageBody(item),
-          })),
-      ];
-      setTranscript((current) => [...current, inbound, ...outboundMessages]);
+      );
     } catch (reason) {
       setError(
         reason instanceof Error && reason.message === "simulator_unavailable"
