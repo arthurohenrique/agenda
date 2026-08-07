@@ -7,6 +7,7 @@ interface SimulatorResult {
   conversation?: {
     id: string;
     currentState?: string;
+    options?: unknown;
   } | null;
   tenant?: {
     name: string;
@@ -41,6 +42,9 @@ async function login(page: Page, email: string) {
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(process.env.E2E_PASSWORD ?? "AgendaLocal123!");
   await page.getByRole("button", { name: "Entrar" }).click();
+  // Sem esperar a navegação, um `goto` logo depois corre antes de a sessão existir e
+  // volta para o login. O primeiro uso mascarava isso porque já aguardava a URL.
+  await expect(page).toHaveURL(/\/app\//);
 }
 
 function stateValue(page: Page) {
@@ -295,7 +299,7 @@ test.describe("simulador WhatsApp com banco local", () => {
     await sendSimulatorMessage(page, { message: "2", expectedState: "STAFF_SELECTION" });
     await sendSimulatorMessage(page, { message: "2", expectedState: "DATE_SELECTION" });
     const slotList = await chooseAvailableDate(page, testInfo, 3);
-    const slotToken = findSlotToken(slotList.responses);
+    const slotToken = findSlotToken(slotList.conversation?.options);
     if (!slotToken) throw new Error("simulator_slot_token_missing");
     const [startsAt, , , staffName] = slotToken.split("|");
     if (!startsAt || !staffName) throw new Error("simulator_slot_token_invalid");

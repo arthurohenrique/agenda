@@ -126,6 +126,10 @@ async function loadSimulationResult(input: {
       id: conversation.id,
       currentState: conversation.current_state,
       status: conversation.status,
+      // As opções resolvidas são estado interno da conversa: expor aqui é o que
+      // permite acompanhar qual horário ou serviço cada número da lista representa.
+      // Rota restrita ao platform_owner e ao provedor mock.
+      options: context.success ? context.data.options : [],
     },
     tenant,
     appointment: appointment

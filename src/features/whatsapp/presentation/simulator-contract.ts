@@ -53,6 +53,12 @@ export const whatsappSimulatorResponseSchema = z.object({
     currentState: z.string().optional(),
     state: z.string().optional(),
     status: z.string().optional(),
+    options: z.array(z.object({
+      key: z.string(),
+      label: z.string(),
+      value: z.string(),
+      kind: z.string(),
+    })).optional(),
   }).nullable().optional(),
   tenant: z.object({
     id: z.guid().optional(),
