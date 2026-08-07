@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(171);
+select plan(172);
 
 select ok(
   not exists (
@@ -2290,20 +2290,37 @@ set metadata = metadata || jsonb_build_object(
 )
 where tenant_id = '20000000-0000-0000-0000-000000000002';
 
+-- Os dois candidatos precisam ser reserváveis de forma independente. Slots
+-- consecutivos do mesmo dia se sobrepõem quando a duração do serviço excede o
+-- intervalo da grade, então reservar o primeiro invalidaria o segundo. Pega-se o
+-- primeiro horário de cada um de dois dias distintos.
 create temporary table pgtap_whatsapp_booking_slots on commit drop as
-select row_number() over (order by slot.starts_at, slot.staff_id) as position,
-       slot.starts_at,
-       slot.staff_id
-from public.get_available_slots(
-  'salao-da-ana',
-  '30000000-0000-0000-0000-000000000002',
-  array['42000000-0000-0000-0000-000000000001']::uuid[],
-  null,
-  statement_timestamp() + interval '1 day',
-  statement_timestamp() + interval '30 days',
-  'America/Sao_Paulo',
-  2
-) slot;
+select row_number() over (order by chosen.starts_at, chosen.staff_id) as position,
+       chosen.starts_at,
+       chosen.staff_id
+from (
+  select first_of_day.starts_at, first_of_day.staff_id
+  from (
+    select distinct on ((slot.starts_at at time zone 'America/Sao_Paulo')::date)
+           slot.starts_at,
+           slot.staff_id
+    from public.get_available_slots(
+      'salao-da-ana',
+      '30000000-0000-0000-0000-000000000002',
+      array['42000000-0000-0000-0000-000000000001']::uuid[],
+      null,
+      statement_timestamp() + interval '1 day',
+      statement_timestamp() + interval '30 days',
+      'America/Sao_Paulo',
+      200
+    ) slot
+    order by (slot.starts_at at time zone 'America/Sao_Paulo')::date,
+             slot.starts_at,
+             slot.staff_id
+  ) first_of_day
+  order by first_of_day.starts_at, first_of_day.staff_id
+  limit 2
+) chosen;
 select is(
   (select count(*)::integer from pgtap_whatsapp_booking_slots),
   2,
@@ -2413,7 +2430,7 @@ select throws_ok(
   'slot_unavailable',
   'Nova idempotency key não contorna conflito com slot já ocupado'
 );
-select ok(
+select is(
   (
     select bool_and(
       public.enqueue_whatsapp_appointment_notification(event.id) ->> 'reason' =
@@ -2423,15 +2440,21 @@ select ok(
     join pgtap_whatsapp_booking_result stored
       on event.aggregate_id = (stored.result ->> 'appointmentId')::uuid
     where event.event_type in ('appointment.created', 'appointment.confirmed')
-  ) and exists (
-    select 1
+  ),
+  true,
+  'Operação já respondida suprime created/confirmed duplicados'
+);
+select is(
+  (
+    select count(*)::integer
     from public.outbox_events reminder
     join pgtap_whatsapp_booking_result stored
       on reminder.aggregate_id = (stored.result ->> 'appointmentId')::uuid
     where reminder.event_type = 'appointment.reminder_due'
       and reminder.processed_at is null
-  ),
-  'Operação já respondida suprime created/confirmed duplicados e mantém reminders'
+  ) > 0,
+  true,
+  'Operação já respondida mantém reminders pendentes'
 );
 
 select lives_ok(
@@ -2454,10 +2477,14 @@ select lives_ok(
   $$,
   'Chave idempotente distinta cria reserva em outro slot disponível'
 );
+-- O bucket permite 8 por janela e é consumido antes da checagem de slot, inclusive
+-- em replay idempotente. Duas confirmações já entraram (fixture e slot do segundo
+-- dia); tentativas que falharam não contam, porque a exceção desfaz o consumo. Seis
+-- repetições deixam o bucket exatamente no limite para a asserção seguinte.
 do $$
 declare counter integer;
 begin
-  for counter in 1..5 loop
+  for counter in 1..6 loop
     perform public.create_whatsapp_booking(
       '20000000-0000-0000-0000-000000000002',
       '30000000-0000-0000-0000-000000000002',

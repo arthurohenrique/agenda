@@ -1535,6 +1535,14 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
 
 13. Plano de rollback em docs/whatsapp-meta-activation.md:19 consta como "A preencher".
 
+15. Rate limit de reserva pública só conta tentativa bem-sucedida.
+    app_private.consume_public_rate_limit roda dentro da mesma transação da reserva,
+    antes da checagem de slot. Quando a reserva falha — slot ocupado, por exemplo — a
+    exceção desfaz também o consumo do bucket. O limitador passa a throttlar apenas
+    confirmações que deram certo, e não tentativas repetidas contra horários
+    indisponíveis. Vale para o site público e para o canal WhatsApp, que compartilham
+    create_public_booking. Corrigir exige consumo fora da transação da reserva.
+
 14. Linhagem do restart é apagada pela primeira transição seguinte.
     commit_whatsapp_conversation_transition faz `context = p_context`, substituição
     integral, e o conversationContextSchema do app (Zod) não carrega
