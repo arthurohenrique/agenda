@@ -47,6 +47,17 @@ Detalhes: [auditoria](../security/AUDIT_SUMMARY.md).
 - `npm audit --omit=dev --audit-level=high`: zero vulnerabilidades.
 - `npm audit --audit-level=high`: zero vulnerabilidades.
 
+## Suíte completa executada
+
+A CI está verde em `39d1d91`: `application` e `database-and-e2e` passam. Migrations de
+`0001` a `0025` aplicam do zero, o seed carrega, a suíte pgTAP roda 173 asserções, a de
+integração passa e os 51 cenários e2e passam, sem flaky.
+
+Destravar essa execução revelou seis defeitos de produção que lint, typecheck e teste
+unitário não alcançavam — dois deles fora do canal WhatsApp, no worker de notificações e
+na agenda administrativa. Detalhe em [relatório](whatsapp-validation-report.md), seção
+"Execução da suíte — depois da auditoria".
+
 ## Bloqueios locais
 
 Docker e `psql` não estão instalados neste ambiente. Reset do Supabase, pgTAP,
@@ -66,8 +77,8 @@ Checklist de 707 itens aplicado ao commit `33a7ad4`:
 | Não implementados | 14 |
 | Não aplicáveis | 2 |
 
-Declaração: **estrutura parcialmente aprovada, com pendências não bloqueantes**,
-condicionada à execução da suíte de banco. "Integração real com a Meta validada"
+Declaração: **estrutura aprovada para uso com provedor mock**. A condição registrada na
+entrega — executar a suíte de banco — foi cumprida. "Integração real com a Meta validada"
 permanece desmarcada: não há evidência de envio, recebimento, status ou webhook com
 credenciais e número reais.
 

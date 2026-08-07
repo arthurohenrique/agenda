@@ -1326,9 +1326,59 @@ Todos bloqueados pela ausência de conta/credenciais Meta.
 | `[ ]` Não implementados | 14 |
 | `[N/A]` Não aplicáveis | 2 |
 
-Dos 156 `[~]`, **≈120 são exclusivamente pendência de execução** (migrations, RLS,
-integração e e2e não rodados por ausência de Docker) — o artefato de teste existe e está
-no pipeline de CI. Os ~36 restantes são implementações genuinamente parciais.
+Dos 156 `[~]`, **≈120 eram exclusivamente pendência de execução** (migrations, RLS,
+integração e e2e não rodados por ausência de Docker). **Essa pendência foi resolvida
+depois da auditoria** — ver a seção seguinte. Os ~36 restantes são implementações
+genuinamente parciais e continuam válidas.
+
+## Execução da suíte — depois da auditoria
+
+A auditoria foi entregue com a suíte de banco nunca executada. Ela passou a executar, e
+a CI está verde em `39d1d91`:
+
+```
+JOB application: success
+JOB database-and-e2e: success
+
+npx supabase start        migrations 0001–0025 aplicadas
+npx supabase db reset     seed carregado
+npm run test:db           All tests successful — 173 asserções pgTAP
+npm run test:integration  1 passed
+npm run test:e2e          51 passed
+```
+
+Com isso, os itens marcados `[~]` por dependerem de execução passam a estar cobertos:
+migrations aplicando do zero, RLS entre tenants, concorrência real no banco, criação de
+reserva pelo fluxo simulado, webhook duplicado, inbox, outbox, retry, dead letter e
+handoff.
+
+### Defeitos de produção encontrados ao destravar a suíte
+
+Nenhum deles era detectável por lint, typecheck ou teste unitário; todos exigiam o banco
+ou o navegador.
+
+| # | Defeito | Efeito real |
+|---|---|---|
+| 1 | Variável `%rowtype` em lista `INTO` com vários itens, em 9 funções | Nenhuma migration do canal aplicava |
+| 2 | `check (name ~ '^[a-z0-9_]{1,512}$')` — regex do Postgres aceita no máximo 255 | Seed quebrava no primeiro insert de template |
+| 3 | `customer_id` ambíguo no `on conflict` de `resolve_whatsapp_customer_tenant` | Vincular contato a cliente falhava em execução |
+| 4 | `service_role` sem `select` nas tabelas do núcleo, inclusive as embutidas | Listar serviços, profissionais e agendamentos falhava |
+| 5 | Agenda renderizava `customers.full_name` | Estabelecimento via o nome de perfil do WhatsApp, nunca o informado na reserva |
+| 6 | Handoff só reconhecia comando exato | "Quero falar com atendente" não chegava a um humano |
+
+Os defeitos 4 e 5 atingem também o worker de notificações e a agenda administrativa, ou
+seja, existiam fora do canal WhatsApp.
+
+### Defeitos dos próprios testes
+
+Treze correções, entre elas: constraint de lock violada ao expirar lease, `ok()` sobre
+`and` com mutação — que podia pular a mutação por curto-circuito —, `jsonb_object_length`
+inexistente, chave de rate limit abaixo do mínimo, fixture escolhendo horários que se
+sobrepõem, `getByLabel` exato contra um textarea cujo valor entra no `textContent` do
+label, corrida no login e um cenário de concorrência que reservava profissional diferente
+do disputado, logo nunca gerava conflito.
+
+
 
 ## Comandos executados
 
@@ -1479,12 +1529,10 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
    `seed.sql`. Corrigido separando comprimento da expressão, preservando o limite de
    512 caracteres da Meta.
 
-1. VALIDAÇÃO NÃO EXECUTADA — migrations, supabase test db (RLS, 165 asserções),
-   testes de integração e e2e não rodaram nesta máquina por ausência de Docker.
-   Sem isso NÃO é possível afirmar que RLS, concorrência, idempotência de webhook e
-   criação real de reserva funcionam. Ação: rodar `npx supabase start`,
-   `npx supabase db reset`, `npm run test:db`, `RUN_DB_TESTS=1 npm run test:integration`,
-   `RUN_E2E_DB=1 npm run test:e2e`.
+1. [RESOLVIDO] VALIDAÇÃO NÃO EXECUTADA — a suíte passou a rodar na CI e está verde em
+   `39d1d91`: migrations de 0001 a 0025, seed, 173 asserções pgTAP, integração e 51
+   cenários e2e. RLS, concorrência, idempotência de webhook e criação real de reserva
+   estão cobertas. Ver a seção "Execução da suíte — depois da auditoria".
 
 2. [RETIRADO] `npm run validate` não quebra em checkout limpo. Registrado antes como
    bloqueante por causa de um TS2769 em tenant-whatsapp-panel.tsx:207, que vinha de um
@@ -1587,8 +1635,12 @@ liberação de produção.  (27 itens — §42)
 
 ## Declaração final
 
-* [x] **Estrutura parcialmente aprovada, com pendências não bloqueantes** — *condicionada
-  à execução da suíte de banco.*
+* [x] **Estrutura aprovada para uso com provedor mock.**
+
+  A condição registrada na entrega da auditoria — executar a suíte de banco — foi
+  cumprida. A CI está verde em `39d1d91`, com migrations aplicando do zero, seed
+  carregado, 173 asserções pgTAP, integração e 51 cenários e2e passando. Os seis
+  defeitos de produção que a execução revelou estão corrigidos.
 
 Justificativa: o canal está implementado com profundidade real — reuso do motor
 transacional existente, inbox/outbox com lock, backoff e dead letter, ordenação causal de
@@ -1596,11 +1648,11 @@ eventos, RLS forçada com grants colunares, política de janela/opt-in/template,
 com legal hold e simulador funcional. Lint, typecheck (pós-build), build e 238 testes
 unitários passam.
 
-**Não** foi possível marcar "Estrutura aprovada para uso com provedor mock" porque a
-suíte que prova RLS, concorrência e criação real de reserva (`supabase test db`,
-integração e e2e) não pôde ser executada nesta máquina. Rodadas com sucesso essas três
-suítes e corrigida a ordem do `npm run validate`, a declaração sobe para **aprovada para
-uso com provedor mock**.
+As pendências não bloqueantes listadas acima continuam abertas — dead letter sem
+reprocessamento, ausência de métricas, política de cancelamento duplicada, Embedded
+Signup e Flows como estrutura, linhagem do restart apagada pela transição seguinte e
+rate limit que só conta tentativa bem-sucedida. Nenhuma delas impede o uso com o
+provedor mock.
 
 * [ ] Integração real com a Meta validada em homologação. — não há evidência de envio,
   recebimento, status ou webhook com credenciais reais. Correto permanecer desmarcado.
