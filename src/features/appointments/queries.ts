@@ -10,7 +10,10 @@ const appointmentRowSchema = z.object({
   ends_at: z.string(),
   status: z.enum(appointmentStatuses),
   total_cents: z.number().int(),
-  customer_tenants: z.object({ customers: z.object({ full_name: z.string() }) }),
+  customer_tenants: z.object({
+    display_name: z.string().nullable(),
+    customers: z.object({ full_name: z.string() }),
+  }),
   staff: z.object({ name: z.string() }).nullable(),
   appointment_services: z.array(z.object({ name_snapshot: z.string() })),
 });
@@ -52,7 +55,7 @@ export async function getAppointments(
   const { data, error } = await supabase
     .from("appointments")
     .select(
-      "id, starts_at, ends_at, status, total_cents, customer_tenants!inner(customers!inner(full_name)), staff(name), appointment_services(name_snapshot)",
+      "id, starts_at, ends_at, status, total_cents, customer_tenants!inner(display_name, customers!inner(full_name)), staff(name), appointment_services(name_snapshot)",
     )
     .eq("tenant_id", tenantId)
     .gte("starts_at", rangeStart)
@@ -66,7 +69,12 @@ export async function getAppointments(
     endsAt: appointment.ends_at,
     status: appointment.status,
     totalCents: appointment.total_cents,
-    customerName: appointment.customer_tenants.customers.full_name,
+    // O rótulo por estabelecimento recebe o nome informado na reserva; `full_name` é a
+    // identidade global e só é gravada na criação do cliente. Mesma precedência já
+    // usada na listagem de clientes.
+    customerName:
+      appointment.customer_tenants.display_name ??
+      appointment.customer_tenants.customers.full_name,
     staffName: appointment.staff?.name ?? null,
     serviceName:
       appointment.appointment_services.map((service) => service.name_snapshot).join(" + ") ||

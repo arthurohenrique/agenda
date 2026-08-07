@@ -313,6 +313,19 @@ test.describe("simulador WhatsApp com banco local", () => {
     const localDate = formatInTimeZone(startsAt, "America/Sao_Paulo", "yyyy-MM-dd");
     const localTime = formatInTimeZone(startsAt, "America/Sao_Paulo", "HH:mm");
     await publicPage.getByLabel("Escolher outra data").fill(localDate);
+    // Espera a lista recarregar antes de procurar o horário: a ausência do botão logo
+    // após preencher a data pode ser só atraso da consulta de disponibilidade. Quando o
+    // horário realmente não é oferecido, a asserção mostra a lista inteira em vez de
+    // estourar num clique sem diagnóstico.
+    const offeredSlots = publicPage.getByRole("button", { name: /^\d{2}:\d{2} com / });
+    await expect(offeredSlots.first()).toBeVisible();
+    const offeredLabels = await offeredSlots.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("aria-label")),
+    );
+    expect(
+      offeredLabels,
+      `horários oferecidos pelo site em ${localDate}`,
+    ).toContain(`${localTime} com ${staffName}`);
     await publicPage.getByRole("button", { name: `${localTime} com ${staffName}` }).click();
     await publicPage.getByLabel("Nome completo").fill(`Concorrente Site ${testInfo.project.name}`);
     await publicPage.getByLabel("Telefone com DDD").fill(

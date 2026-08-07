@@ -1539,6 +1539,15 @@ tests/fixtures/whatsapp/sanitized-webhooks.json      10 fixtures.
 
 13. Plano de rollback em docs/whatsapp-meta-activation.md:19 consta como "A preencher".
 
+16. [CORRIGIDO] Agenda administrativa mostrava o nome de perfil do WhatsApp.
+    A conversa pergunta o nome do cliente e a reserva grava esse valor em
+    customer_tenants.display_name, mas customers.full_name só é escrito na criação do
+    cliente — que acontece antes, na confirmação do tenant, com o nome de perfil do
+    WhatsApp. Como a consulta da agenda renderizava full_name, o estabelecimento via o
+    nome de perfil, nunca o informado no agendamento. A agenda passa a usar
+    display_name com queda para full_name, mesma precedência que a listagem de clientes
+    já aplicava.
+
 15. Rate limit de reserva pública só conta tentativa bem-sucedida.
     app_private.consume_public_rate_limit roda dentro da mesma transação da reserva,
     antes da checagem de slot. Quando a reserva falha — slot ocupado, por exemplo — a
