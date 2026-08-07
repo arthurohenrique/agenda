@@ -78,7 +78,10 @@ async function sendSimulatorMessage(
     outOfOrder?: boolean;
   },
 ) {
-  await page.getByLabel("Mensagem", { exact: true }).fill(input.message);
+  // Localiza pelo nome acessível, não pelo texto do label: o label envolve o textarea,
+  // e React renderiza o valor inicial de um textarea como nó filho, então
+  // `label.textContent` vale "MensagemOlá, quero agendar." e nunca casa com `exact`.
+  await page.getByRole("textbox", { name: "Mensagem", exact: true }).fill(input.message);
   await page.getByLabel("Código do estabelecimento").fill(input.routingCode ?? "");
   await page.getByLabel("Webhook duplicado").setChecked(input.duplicate ?? false);
   await page.getByLabel("Falha transitória do provedor").setChecked(
