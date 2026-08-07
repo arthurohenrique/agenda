@@ -2477,14 +2477,18 @@ select lives_ok(
   $$,
   'Chave idempotente distinta cria reserva em outro slot disponível'
 );
--- O bucket permite 8 por janela e é consumido antes da checagem de slot, inclusive
--- em replay idempotente. Duas confirmações já entraram (fixture e slot do segundo
--- dia); tentativas que falharam não contam, porque a exceção desfaz o consumo. Seis
--- repetições deixam o bucket exatamente no limite para a asserção seguinte.
+-- A asserção de limite é isolada em vez de calibrada: contar quantas confirmações
+-- anteriores deste arquivo já entraram no bucket é frágil, porque o consumo acontece
+-- antes da checagem de slot, vale também para replay idempotente, e é desfeito quando
+-- a chamada falha. Zerando a janela, o laço a satura com exatamente o limite (8, o
+-- padrão de app_private.consume_public_rate_limit) e a chamada seguinte tem de estourar.
+delete from public.public_rate_limits
+where tenant_id = '20000000-0000-0000-0000-000000000002';
+
 do $$
 declare counter integer;
 begin
-  for counter in 1..6 loop
+  for counter in 1..8 loop
     perform public.create_whatsapp_booking(
       '20000000-0000-0000-0000-000000000002',
       '30000000-0000-0000-0000-000000000002',
@@ -2525,6 +2529,9 @@ select throws_ok(
   'rate_limit_exceeded',
   'Bucket estável por tenant/contato limita confirmações com várias idempotency keys'
 );
+-- Devolve a janela zerada para o restante do arquivo não herdar o bucket saturado.
+delete from public.public_rate_limits
+where tenant_id = '20000000-0000-0000-0000-000000000002';
 
 select public.cancel_whatsapp_booking(
   '20000000-0000-0000-0000-000000000002',
