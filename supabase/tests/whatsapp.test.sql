@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(172);
+select plan(173);
 
 select ok(
   not exists (
@@ -2559,9 +2559,26 @@ select is(
   'whatsapp',
   'Gateway reagenda appointment real e marca a operação WhatsApp'
 );
-select ok(
+select is(
   (
-    select count(*) = 3 and bool_and(
+    select count(*)::integer
+    from public.outbox_events event
+    join pgtap_whatsapp_booking_result original on true
+    join pgtap_whatsapp_reschedule_result moved on true
+    where (
+      event.aggregate_id = (moved.result ->> 'appointmentId')::uuid
+      and event.event_type in ('appointment.created', 'appointment.confirmed')
+    ) or (
+      event.aggregate_id = (original.result ->> 'appointmentId')::uuid
+      and event.event_type = 'appointment.rescheduled'
+    )
+  ),
+  3,
+  'Reagendamento produz created, confirmed e rescheduled'
+);
+select is(
+  (
+    select bool_and(
       public.enqueue_whatsapp_appointment_notification(event.id) ->> 'reason' =
         'whatsapp_originated_operation'
     )
@@ -2576,6 +2593,7 @@ select ok(
       and event.event_type = 'appointment.rescheduled'
     )
   ),
+  true,
   'Reagendamento suprime created, confirmed e rescheduled da resposta conversacional'
 );
 reset role;
@@ -2592,6 +2610,11 @@ from public.get_available_slots(
   'America/Sao_Paulo',
   1
 ) slot;
+-- A temporária pertence ao papel da sessão, mas é lida adiante sob anon e
+-- service_role. Sem este grant, o acesso é negado com 42501 — o que quebrava as
+-- asserções do wrapper de consentimento e fazia a asserção de anon passar pelo motivo
+-- errado, já que ela só verifica o código 42501, não a mensagem.
+grant select on pgtap_whatsapp_slot to anon, service_role;
 
 select ok(
   exists (select 1 from pgtap_whatsapp_slot),
