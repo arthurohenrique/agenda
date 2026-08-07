@@ -32,10 +32,17 @@ mock: não abre sessão de WhatsApp Web e não envia mensagens reais. O número 
 é roteado por código do estabelecimento, sessão ou histórico; a modelagem também
 aceita números exclusivos, próprios e múltiplos números por tenant.
 
+O canal é validado de ponta a ponta na CI: as migrations aplicam do zero, o seed
+carrega, 173 asserções pgTAP cobrem RLS, workers e concorrência, e 51 cenários
+Playwright percorrem o simulador, incluindo reserva real, evento duplicado, disputa de
+horário com o site e atendimento humano.
+
 O tráfego Meta permanece desativado até existirem aplicativo, WABA, número
 registrado, webhook HTTPS, templates aprovados e segredos no cofre. Consulte a
-[decisão arquitetural](docs/adr/0001-whatsapp-cloud-api-channel.md) e o
-[checklist de ativação](docs/whatsapp-meta-activation.md).
+[decisão arquitetural](docs/adr/0001-whatsapp-cloud-api-channel.md), o
+[checklist de ativação](docs/whatsapp-meta-activation.md) e a
+[auditoria do canal](docs/whatsapp-validation-report.md), que lista item a item o que
+está coberto e o que segue pendente.
 
 ## Identidade visual por estabelecimento
 
