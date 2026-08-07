@@ -52,3 +52,14 @@ jobs:
       - run: npm run test:e2e
         env:
           RUN_E2E_DB: "1"
+      # O snapshot de acessibilidade que o Playwright grava por teste é o que permite
+      # diagnosticar um seletor que não resolve, sem precisar reproduzir localmente.
+      - name: Show Playwright error context
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for context in test-results/*/error-context.md; do
+            echo "===== $context ====="
+            cat "$context"
+          done
