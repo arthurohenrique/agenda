@@ -34,7 +34,11 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
 ## Antes de editar
 
 1. Leia `docs/TECHNICAL.md`, `docs/ARCHITECTURE.md` e `docs/DATABASE.md`.
-   Para o canal WhatsApp, leia também `docs/whatsapp-validation-report.md`.
+   Para o canal WhatsApp, leia também `docs/whatsapp-validation-report.md` e
+   `docs/whatsapp-producao-licoes.md`. O segundo registra defeitos que só
+   apareceram com número e cliente reais, e os invariantes do caminho de
+   conversa — inclusive a ordem gravar, travar, transicionar. Nenhum deles foi
+   pego por teste, lint ou build.
 2. Verifique `git status --short` e preserve alterações não relacionadas.
 3. Localize consumidores com `rg` antes de renomear tabelas, RPCs ou campos.
 4. Nunca coloque `sb_secret`, `service_role` ou senhas reais em código, logs ou docs.
