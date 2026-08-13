@@ -13,6 +13,7 @@ import {
   findInboundMessage,
   findLatestOutboundProviderMessageId,
   findPhoneNumber,
+  findUnprocessedRepliesToPrompt,
   getConversationById,
   getOrCreateConversation,
   ignoreInboundMessage,
@@ -35,6 +36,14 @@ function normalizeProviderPhone(value: string): string | null {
   const trimmed = value.trim();
   const withPrefix = /^\d{10,15}$/.test(trimmed) ? `+${trimmed}` : trimmed;
   return normalizePhone(withPrefix);
+}
+
+// Tempo que um toque espera antes de virar transição. Toques em rajada chegam
+// em menos de meio segundo; um segundo cobre com folga sem pesar na conversa.
+const TAP_SETTLE_MS = 1_000;
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 // Só o corpo de uma pergunta com opções vale guardar: texto solto não é algo a
@@ -70,6 +79,7 @@ function repeatCurrentPrompt(
   conversation: PersistedConversation,
   message: InboundConversationMessage,
   capabilities: ConversationCapabilities,
+  reason: "multiple" | "already_answered",
 ): ConversationTransition {
   return {
     state: conversation.currentState,
@@ -85,7 +95,9 @@ function repeatCurrentPrompt(
     responses: [
       repromptResponse(
         [
-          "Essa pergunta já foi respondida. Vamos continuar daqui:",
+          reason === "multiple"
+            ? "Recebi mais de uma opção. Toque em apenas uma para continuar:"
+            : "Essa pergunta já foi respondida. Vamos continuar daqui:",
           conversation.context.prompt ?? "",
         ].filter(Boolean).join("\n\n"),
         conversation.context.options,
@@ -148,39 +160,45 @@ export async function processInboundMessage(
     Number.isFinite(sessionExpiresAt) &&
     sessionExpiresAt <= Math.max(Date.now(), Number.isFinite(receivedAt) ? receivedAt : 0);
   const workerId = processingWorkerId.slice(0, 120);
+  // Gravar antes de travar é o que torna possível enxergar toques concorrentes.
+  // Enquanto a gravação acontecia sob trava, o segundo toque ficava bloqueado e
+  // o primeiro nunca sabia da existência dele. A gravação é idempotente por
+  // `provider_message_id` e a transição continua acontecendo sob trava.
+  const inbound = await recordInboundMessage({
+    provider: message.provider,
+    providerMessageId: message.providerMessageId,
+    conversation,
+    tenantId: conversation.tenantId,
+    messageType: message.messageType,
+    text: message.text,
+    providerReplyToId: message.providerReplyToId,
+    receivedAt: message.receivedAt,
+  });
+  if (inbound.duplicate && inbound.processed) {
+    return {
+      conversationId: conversation.id,
+      tenantId: conversation.tenantId,
+      state: conversation.currentState,
+      duplicate: true,
+      responsesQueued: 0,
+    };
+  }
+  if (inbound.stale) {
+    await ignoreInboundMessage(inbound.id);
+    return {
+      conversationId: conversation.id,
+      tenantId: conversation.tenantId,
+      state: conversation.currentState,
+      duplicate: inbound.duplicate,
+      responsesQueued: 0,
+    };
+  }
+  // Janela de acomodação. Toque em botão vira transição imediata, então sem
+  // esperar não há como saber se o cliente tocou em mais de uma opção. Só vale
+  // para toque: texto digitado não tem contexto de resposta e segue direto.
+  if (message.providerReplyToId) await delay(TAP_SETTLE_MS);
   conversation = await lockConversation({ conversation, workerId });
   try {
-    const inbound = await recordInboundMessage({
-      provider: message.provider,
-      providerMessageId: message.providerMessageId,
-      conversation,
-      tenantId: conversation.tenantId,
-      messageType: message.messageType,
-      text: message.text,
-      providerReplyToId: message.providerReplyToId,
-      receivedAt: message.receivedAt,
-    });
-    if (inbound.duplicate && inbound.processed) {
-      await releaseConversationLock({ conversationId: conversation.id, workerId });
-      return {
-        conversationId: conversation.id,
-        tenantId: conversation.tenantId,
-        state: conversation.currentState,
-        duplicate: true,
-        responsesQueued: 0,
-      };
-    }
-    if (inbound.stale) {
-      await ignoreInboundMessage(inbound.id);
-      await releaseConversationLock({ conversationId: conversation.id, workerId });
-      return {
-        conversationId: conversation.id,
-        tenantId: conversation.tenantId,
-        state: conversation.currentState,
-        duplicate: inbound.duplicate,
-        responsesQueued: 0,
-      };
-    }
     const transitionView = sessionExpired
       ? {
           ...conversation,
@@ -194,9 +212,30 @@ export async function processInboundMessage(
     // um "1" atrasado casaria com a primeira opção da pergunta atual e escolheria
     // algo que o cliente não pediu — foi assim que "Sem preferência" virou seleção
     // de profissional. Fora do caso claro de atraso, processa normalmente.
-    const staleTap = await isStaleInteractiveReply(message, transitionView);
+    // Mais de um toque na mesma pergunta dentro da janela. Escolher o primeiro
+    // seria arbitrário — vence quem chegou antes, não a intenção do cliente.
+    // Nenhum é considerado, os irmãos saem de cena e a pergunta é repetida
+    // pedindo uma escolha só.
+    const siblings = message.providerReplyToId
+      ? await findUnprocessedRepliesToPrompt({
+        conversationId: conversation.id,
+        providerReplyToId: message.providerReplyToId,
+        excludeMessageId: inbound.id,
+      })
+      : [];
+    for (const siblingId of siblings) await ignoreInboundMessage(siblingId);
+    const staleTap = siblings.length > 0 ||
+      await isStaleInteractiveReply(message, transitionView);
     const result = staleTap
-      ? { conversation: transitionView, transition: repeatCurrentPrompt(transitionView, message, capabilities) }
+      ? {
+        conversation: transitionView,
+        transition: repeatCurrentPrompt(
+          transitionView,
+          message,
+          capabilities,
+          siblings.length > 0 ? "multiple" : "already_answered",
+        ),
+      }
       : await transitionConversation({
         message,
         conversation: transitionView,

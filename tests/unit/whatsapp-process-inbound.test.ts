@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   findInboundMessage: vi.fn(),
   findLatestOutboundProviderMessageId: vi.fn(),
   findPhoneNumber: vi.fn(),
+  findUnprocessedRepliesToPrompt: vi.fn(),
   getConversationById: vi.fn(),
   getOrCreateConversation: vi.fn(),
   ignoreInboundMessage: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock(
     findInboundMessage: mocks.findInboundMessage,
     findLatestOutboundProviderMessageId: mocks.findLatestOutboundProviderMessageId,
     findPhoneNumber: mocks.findPhoneNumber,
+    findUnprocessedRepliesToPrompt: mocks.findUnprocessedRepliesToPrompt,
     getConversationById: mocks.getConversationById,
     getOrCreateConversation: mocks.getOrCreateConversation,
     ignoreInboundMessage: mocks.ignoreInboundMessage,
@@ -108,6 +110,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.findInboundMessage.mockResolvedValue(null);
   mocks.findLatestOutboundProviderMessageId.mockResolvedValue(null);
+  mocks.findUnprocessedRepliesToPrompt.mockResolvedValue([]);
   mocks.findPhoneNumber.mockResolvedValue({
     id: ids.phone,
     provider: "mock",
@@ -270,7 +273,11 @@ describe("WhatsApp inbound processing", () => {
     });
   });
 
-  it("locks before watermarking and rejects an unexpected stale event", async () => {
+  it("rejects an unexpected stale event sem precisar da trava", async () => {
+    // A gravação passou a preceder a trava para que toques concorrentes na
+    // mesma pergunta fiquem visíveis um ao outro. O evento fora de ordem é
+    // recusado pela marca d'água da própria gravação, que é atômica no banco;
+    // a trava continua protegendo o que importa, que é a transição.
     mocks.recordInboundMessage.mockResolvedValue({
       id: ids.message,
       duplicate: false,
@@ -283,13 +290,24 @@ describe("WhatsApp inbound processing", () => {
       maxListRows: 10,
     }, gateway(), "worker-1");
 
-    expect(mocks.lockConversation).toHaveBeenCalledOnce();
     expect(mocks.ignoreInboundMessage).toHaveBeenCalledWith(ids.message);
     expect(mocks.transitionConversation).not.toHaveBeenCalled();
     expect(mocks.commitTransition).not.toHaveBeenCalled();
     expect(result.responsesQueued).toBe(0);
+    // Sem transição a fazer, não há por que tomar a trava.
+    expect(mocks.lockConversation).not.toHaveBeenCalled();
+  });
+
+  it("mantém a transição sob trava, depois de gravar a mensagem", async () => {
+    await processInboundMessage(message, {
+      maxReplyButtons: 3,
+      maxListRows: 10,
+    }, gateway(), "worker-1");
+
+    expect(mocks.recordInboundMessage.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.lockConversation.mock.invocationCallOrder[0] ?? 0);
     expect(mocks.lockConversation.mock.invocationCallOrder[0])
-      .toBeLessThan(mocks.recordInboundMessage.mock.invocationCallOrder[0] ?? 0);
+      .toBeLessThan(mocks.commitTransition.mock.invocationCallOrder[0] ?? 0);
   });
 
   it("locks before transition and resumes an unprocessed duplicate", async () => {
@@ -360,6 +378,28 @@ describe("WhatsApp inbound processing", () => {
           { key: "2", label: "Camila", value: ids.tenant, kind: "staff" },
         ],
       }),
+    });
+
+    it("descarta os dois toques quando o cliente escolhe mais de uma opção", async () => {
+      // Regra pedida: nenhum dos toques vence por ter chegado antes. Ambos saem
+      // de cena e a pergunta volta, pedindo uma escolha só.
+      mocks.getOrCreateConversation.mockResolvedValue(withOptions());
+      mocks.lockConversation.mockResolvedValue(withOptions());
+      mocks.findUnprocessedRepliesToPrompt.mockResolvedValue(["irmao-1"]);
+
+      await processInboundMessage(
+        { ...message, text: "1", providerReplyToId: "wamid.pergunta" },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).not.toHaveBeenCalled();
+      expect(mocks.ignoreInboundMessage).toHaveBeenCalledWith("irmao-1");
+      const committed = mocks.commitTransition.mock.calls[0]?.[0];
+      expect(committed.transition.state).toBe("STAFF_SELECTION");
+      expect(committed.transition.responses[0].body).toContain("mais de uma opção");
+      expect(committed.transition.responses[0].body).toContain("Escolha o profissional:");
     });
 
     it("não deixa um toque atrasado escolher pela pergunta atual", async () => {

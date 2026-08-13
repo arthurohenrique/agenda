@@ -419,6 +419,34 @@ export async function findLatestOutboundProviderMessageId(
     .parse(data)?.provider_message_id ?? null;
 }
 
+// Toques concorrentes na mesma pergunta. Só são visíveis aqui porque a mensagem
+// passa a ser gravada antes de a conversa ser travada — enquanto a gravação
+// acontecia sob trava, o segundo toque ficava bloqueado e invisível ao primeiro.
+export async function findUnprocessedRepliesToPrompt(input: {
+  conversationId: string;
+  providerReplyToId: string;
+  excludeMessageId: string;
+}): Promise<string[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("whatsapp_messages")
+    .select("id")
+    .eq("conversation_id", input.conversationId)
+    .eq("direction", "inbound")
+    .eq("provider_reply_to_id", input.providerReplyToId)
+    .is("processed_at", null)
+    .neq("id", input.excludeMessageId)
+    .limit(10);
+  if (error) {
+    throw repositoryFailure(
+      "inbound_message_query_failed",
+      "find_prompt_replies",
+      error,
+    );
+  }
+  return z.array(z.object({ id: z.guid() })).parse(data ?? []).map((row) => row.id);
+}
+
 export async function upsertContact(input: {
   provider: string;
   normalizedPhone: string;
