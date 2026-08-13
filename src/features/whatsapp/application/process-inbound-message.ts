@@ -6,9 +6,12 @@ import {
   conversationContextSchema,
   type ConversationTransition,
 } from "../domain/conversation";
+import { repromptResponse } from "../presentation/conversation-responses";
+import type { PersistedConversation } from "../domain/conversation";
 import {
   commitTransition,
   findInboundMessage,
+  findLatestOutboundProviderMessageId,
   findPhoneNumber,
   getConversationById,
   getOrCreateConversation,
@@ -32,6 +35,54 @@ function normalizeProviderPhone(value: string): string | null {
   const trimmed = value.trim();
   const withPrefix = /^\d{10,15}$/.test(trimmed) ? `+${trimmed}` : trimmed;
   return normalizePhone(withPrefix);
+}
+
+// Só o corpo de uma pergunta com opções vale guardar: texto solto não é algo a
+// repetir, e repetir a última fala do robô sem opção confundiria mais.
+function promptFromResponses(transition: ConversationTransition): string | null {
+  if (transition.context.options.length === 0) return null;
+  for (const response of [...transition.responses].reverse()) {
+    if (response.kind === "reply_buttons" || response.kind === "list") return response.body;
+  }
+  return null;
+}
+
+async function isStaleInteractiveReply(
+  message: InboundConversationMessage,
+  conversation: PersistedConversation,
+): Promise<boolean> {
+  // Sem contexto de resposta é texto digitado, não toque em balão antigo.
+  if (!message.providerReplyToId) return false;
+  // Sem opção de pé não há escolha a proteger.
+  if (conversation.context.options.length === 0) return false;
+  const latest = await findLatestOutboundProviderMessageId(conversation.id);
+  // Última saída ainda sem id do provedor: sem base para comparar, deixa passar.
+  if (!latest) return false;
+  return message.providerReplyToId !== latest;
+}
+
+function repeatCurrentPrompt(
+  conversation: PersistedConversation,
+  message: InboundConversationMessage,
+  capabilities: ConversationCapabilities,
+): ConversationTransition {
+  return {
+    state: conversation.currentState,
+    status: "waiting_customer",
+    context: conversationContextSchema.parse({
+      ...conversation.context,
+      lastInboundMessageId: message.providerMessageId,
+    }),
+    // Sem jargão e sem culpar o cliente: ele tocou num botão e espera avançar.
+    // Repetir a pergunta atual mostra onde ele está, com as opções à mão.
+    responses: [
+      repromptResponse(
+        conversation.context.prompt ?? "Vamos continuar de onde paramos.",
+        conversation.context.options,
+        capabilities.maxReplyButtons,
+      ),
+    ],
+  };
 }
 
 export async function processInboundMessage(
@@ -129,20 +180,29 @@ export async function processInboundMessage(
           context: conversationContextSchema.parse({}),
         }
       : conversation;
-    const result = await transitionConversation({
-      message,
-      conversation: transitionView,
-      phoneNumber,
-      contact,
-      gateway,
-      capabilities,
-    });
+    // Toque em botão de mensagem antiga. As chaves são ordinais por estado, então
+    // um "1" atrasado casaria com a primeira opção da pergunta atual e escolheria
+    // algo que o cliente não pediu — foi assim que "Sem preferência" virou seleção
+    // de profissional. Fora do caso claro de atraso, processa normalmente.
+    const staleTap = await isStaleInteractiveReply(message, transitionView);
+    const result = staleTap
+      ? { conversation: transitionView, transition: repeatCurrentPrompt(transitionView, message, capabilities) }
+      : await transitionConversation({
+        message,
+        conversation: transitionView,
+        phoneNumber,
+        contact,
+        gateway,
+        capabilities,
+      });
     const transition: ConversationTransition = {
       ...result.transition,
       ...(sessionExpired ? { restartReason: "session_expired" as const } : {}),
       context: conversationContextSchema.parse({
         ...result.transition.context,
         lastInboundMessageId: message.providerMessageId,
+        // Guarda a pergunta corrente para poder repeti-la ao cliente perdido.
+        prompt: promptFromResponses(result.transition) ?? result.transition.context.prompt,
       }),
       responses: sessionExpired
         ? [

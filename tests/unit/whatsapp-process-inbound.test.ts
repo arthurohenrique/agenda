@@ -5,6 +5,7 @@ import type { WhatsAppBookingGateway } from "@/features/whatsapp/application/boo
 const mocks = vi.hoisted(() => ({
   commitTransition: vi.fn(),
   findInboundMessage: vi.fn(),
+  findLatestOutboundProviderMessageId: vi.fn(),
   findPhoneNumber: vi.fn(),
   getConversationById: vi.fn(),
   getOrCreateConversation: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock(
   () => ({
     commitTransition: mocks.commitTransition,
     findInboundMessage: mocks.findInboundMessage,
+    findLatestOutboundProviderMessageId: mocks.findLatestOutboundProviderMessageId,
     findPhoneNumber: mocks.findPhoneNumber,
     getConversationById: mocks.getConversationById,
     getOrCreateConversation: mocks.getOrCreateConversation,
@@ -105,6 +107,7 @@ function gateway(): WhatsAppBookingGateway {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.findInboundMessage.mockResolvedValue(null);
+  mocks.findLatestOutboundProviderMessageId.mockResolvedValue(null);
   mocks.findPhoneNumber.mockResolvedValue({
     id: ids.phone,
     provider: "mock",
@@ -343,6 +346,75 @@ describe("WhatsApp inbound processing", () => {
         }),
       }),
     );
+  });
+
+  describe("toque em botão de mensagem antiga", () => {
+    const withOptions = () => ({
+      ...conversation(),
+      currentState: "STAFF_SELECTION" as const,
+      context: conversationContextSchema.parse({
+        customerId: ids.customer,
+        prompt: "Escolha o profissional:",
+        options: [
+          { key: "1", label: "Rafael", value: ids.customer, kind: "staff" },
+          { key: "2", label: "Camila", value: ids.tenant, kind: "staff" },
+        ],
+      }),
+    });
+
+    it("não deixa um toque atrasado escolher pela pergunta atual", async () => {
+      // Caso real: cliente tocou "Sem preferência" no balão antigo enquanto a
+      // conversa já pedia o profissional. A chave "1" teria selecionado Rafael.
+      mocks.getOrCreateConversation.mockResolvedValue(withOptions());
+      mocks.lockConversation.mockResolvedValue(withOptions());
+      mocks.findLatestOutboundProviderMessageId.mockResolvedValue("wamid.atual");
+
+      await processInboundMessage(
+        { ...message, text: "1", providerReplyToId: "wamid.antigo" },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).not.toHaveBeenCalled();
+      const committed = mocks.commitTransition.mock.calls[0]?.[0];
+      expect(committed.transition.state).toBe("STAFF_SELECTION");
+      // Repete a pergunta com as opções, sem jargão e sem culpar o cliente.
+      expect(committed.transition.responses[0]).toMatchObject({
+        kind: "reply_buttons",
+        body: "Escolha o profissional:",
+      });
+    });
+
+    it("processa normalmente o toque que responde à última pergunta", async () => {
+      mocks.getOrCreateConversation.mockResolvedValue(withOptions());
+      mocks.lockConversation.mockResolvedValue(withOptions());
+      mocks.findLatestOutboundProviderMessageId.mockResolvedValue("wamid.atual");
+
+      await processInboundMessage(
+        { ...message, text: "1", providerReplyToId: "wamid.atual" },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).toHaveBeenCalledOnce();
+    });
+
+    it("processa texto digitado, que não tem contexto de resposta", async () => {
+      mocks.getOrCreateConversation.mockResolvedValue(withOptions());
+      mocks.lockConversation.mockResolvedValue(withOptions());
+      mocks.findLatestOutboundProviderMessageId.mockResolvedValue("wamid.atual");
+
+      await processInboundMessage(
+        { ...message, text: "1", providerReplyToId: null },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).toHaveBeenCalledOnce();
+    });
   });
 
   it("releases its lease when state interpretation fails", async () => {

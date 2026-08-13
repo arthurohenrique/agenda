@@ -391,6 +391,34 @@ export async function getConversationDeliveryContext(conversationId: string): Pr
   };
 }
 
+// O WhatsApp mantém os botões de mensagens antigas tocáveis para sempre. Saber
+// qual foi a última saída permite distinguir o toque atual do toque atrasado,
+// que responde a uma pergunta que já não está de pé.
+export async function findLatestOutboundProviderMessageId(
+  conversationId: string,
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("whatsapp_messages")
+    .select("provider_message_id")
+    .eq("conversation_id", conversationId)
+    .eq("direction", "outbound")
+    .not("provider_message_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw repositoryFailure(
+      "inbound_message_query_failed",
+      "find_latest_outbound",
+      error,
+    );
+  }
+  return z.object({ provider_message_id: z.string() })
+    .nullable()
+    .parse(data)?.provider_message_id ?? null;
+}
+
 export async function upsertContact(input: {
   provider: string;
   normalizedPhone: string;

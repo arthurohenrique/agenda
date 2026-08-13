@@ -96,6 +96,9 @@ export const conversationContextSchema = z.object({
   customerTenantId: z.guid().optional(),
   lastInboundMessageId: z.string().max(300).optional(),
   lastPromptAt: z.iso.datetime({ offset: true }).optional(),
+  // Última pergunta feita ao cliente. Permite repeti-la quando ele toca num
+  // botão de mensagem antiga, em vez de responder com um aviso técnico.
+  prompt: z.string().max(1024).optional(),
 });
 
 export type ConversationContext = z.infer<typeof conversationContextSchema>;
