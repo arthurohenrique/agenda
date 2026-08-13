@@ -13,7 +13,26 @@ import {
   type PersistedConversation,
 } from "../../domain/conversation";
 import type { ConversationResponse } from "../../domain/provider";
+import { logger } from "@/lib/observability/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+// `classifyWhatsAppError` casa a mensagem exata contra a tabela de códigos
+// transitórios, então a mensagem lançada não pode mudar. O que se perdia era o
+// erro do PostgREST por baixo: deadlock (40P01), timeout de statement (57014) e
+// violação de constraint viravam todos a mesma string opaca, impossível de
+// diagnosticar depois do fato. O código do Postgres vai para o log estruturado e
+// o erro original segue como `cause`, que o Node imprime junto do stack.
+function repositoryFailure(code: string, operation: string, error: unknown): Error {
+  const cause = error as { code?: unknown } | null | undefined;
+  logger.error("whatsapp_repository_failed", {
+    // Somente o código: a mensagem do Postgres pode carregar valores da linha.
+    errorCode: typeof cause?.code === "string" ? cause.code : "rpc_contract_violation",
+    stage: code,
+    operation,
+    result: "failed",
+  });
+  return cause ? new Error(code, { cause }) : new Error(code);
+}
 
 const phoneNumberSchema = z.object({
   id: z.guid(),
@@ -227,7 +246,13 @@ export async function storeWebhookEnvelope(input: {
         .eq("provider", input.provider)
         .eq("external_event_key", externalEventKey)
         .maybeSingle();
-      if (existingError || !existing) throw new Error("whatsapp_inbox_duplicate_query_failed");
+      if (existingError || !existing) {
+        throw repositoryFailure(
+          "whatsapp_inbox_duplicate_query_failed",
+          "store_webhook_envelope",
+          existingError,
+        );
+      }
       const parsed = z.object({ id: z.guid(), correlation_id: z.guid() }).parse(existing);
       return {
         id: parsed.id,
@@ -235,7 +260,7 @@ export async function storeWebhookEnvelope(input: {
         correlationId: parsed.correlation_id,
       };
     }
-    throw new Error("whatsapp_inbox_store_failed");
+    throw repositoryFailure("whatsapp_inbox_store_failed", "store_webhook_envelope", error);
   }
   const id = z.object({ id: z.guid() }).parse(data).id;
   return { id, duplicate: false, correlationId };
@@ -260,7 +285,7 @@ export async function claimWebhookEvents(
         p_worker_id: workerId,
         p_provider: provider,
       });
-  if (error) throw new Error("whatsapp_inbox_claim_failed");
+  if (error) throw repositoryFailure("whatsapp_inbox_claim_failed", "claim_inbox", error);
   return z.array(claimedWebhookSchema).parse(data ?? []);
 }
 
@@ -270,7 +295,9 @@ export async function completeWebhookEvent(eventId: string, workerId: string): P
     p_event_id: eventId,
     p_worker_id: workerId,
   });
-  if (error || data !== true) throw new Error("whatsapp_inbox_complete_failed");
+  if (error || data !== true) {
+    throw repositoryFailure("whatsapp_inbox_complete_failed", "complete_inbox", error);
+  }
 }
 
 export async function deferWebhookEvent(input: {
@@ -286,7 +313,9 @@ export async function deferWebhookEvent(input: {
     p_error: input.errorCode,
     p_retry: input.retry,
   });
-  if (error || data !== true) throw new Error("whatsapp_inbox_defer_failed");
+  if (error || data !== true) {
+    throw repositoryFailure("whatsapp_inbox_defer_failed", "defer_inbox", error);
+  }
 }
 
 export async function findPhoneNumber(input: {
@@ -648,7 +677,7 @@ export async function claimOutboxMessages(
         p_worker_id: workerId,
         p_provider: provider,
       });
-  if (error) throw new Error("whatsapp_outbox_claim_failed");
+  if (error) throw repositoryFailure("whatsapp_outbox_claim_failed", "claim_outbox", error);
   return z.array(claimedOutboxSchema).parse(data ?? []);
 }
 
@@ -663,7 +692,9 @@ export async function completeOutboxMessage(input: {
     p_worker_id: input.workerId,
     p_provider_message_id: input.providerMessageId,
   });
-  if (error || data !== true) throw new Error("whatsapp_outbox_complete_failed");
+  if (error || data !== true) {
+    throw repositoryFailure("whatsapp_outbox_complete_failed", "complete_outbox", error);
+  }
 }
 
 export async function validateOutboxDelivery(input: {
@@ -675,7 +706,9 @@ export async function validateOutboxDelivery(input: {
     p_outbox_id: input.outboxId,
     p_worker_id: input.workerId,
   });
-  if (error) throw new Error("whatsapp_outbox_validation_failed");
+  if (error) {
+    throw repositoryFailure("whatsapp_outbox_validation_failed", "validate_outbox", error);
+  }
   return data === true;
 }
 
@@ -692,7 +725,9 @@ export async function markOutboxDeliveryAmbiguous(input: {
     p_provider_message_id: input.providerMessageId,
     p_error: input.errorCode,
   });
-  if (error || data !== true) throw new Error("whatsapp_outbox_ambiguous_failed");
+  if (error || data !== true) {
+    throw repositoryFailure("whatsapp_outbox_ambiguous_failed", "mark_outbox_ambiguous", error);
+  }
 }
 
 export async function deferOutboxMessage(input: {
@@ -708,7 +743,9 @@ export async function deferOutboxMessage(input: {
     p_error: input.errorCode,
     p_retry: input.retry,
   });
-  if (error || data !== true) throw new Error("whatsapp_outbox_defer_failed");
+  if (error || data !== true) {
+    throw repositoryFailure("whatsapp_outbox_defer_failed", "defer_outbox", error);
+  }
 }
 
 export async function updateMessageStatus(input: {

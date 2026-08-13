@@ -14,6 +14,7 @@ import {
   claimOutboxMessages,
   claimWebhookEvents,
   commitTransition,
+  completeOutboxMessage,
   findInboundMessage,
   lockConversation,
   recordInboundMessage,
@@ -194,6 +195,42 @@ describe("WhatsApp channel repository contracts", () => {
       p_worker_id: "worker-1",
       p_provider: "meta_cloud",
     });
+  });
+
+  it("keeps the retry classification code while preserving the Postgres cause", async () => {
+    const postgrest = {
+      code: "40P01",
+      message: "deadlock detected",
+      details: null,
+      hint: null,
+    };
+    mocks.rpc.mockResolvedValue({ data: null, error: postgrest });
+
+    // A mensagem alimenta `classifyWhatsAppError`, que decide retry contra a
+    // tabela de códigos transitórios: mudá-la transformaria uma falha
+    // recuperável em permanente. O código do Postgres viaja em `cause`.
+    const failure = await claimOutboxMessages(10, "worker-1", "meta_cloud")
+      .then(() => null)
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe("whatsapp_outbox_claim_failed");
+    expect((failure as Error).cause).toBe(postgrest);
+  });
+
+  it("reports a contract violation when the RPC resolves without an error object", async () => {
+    mocks.rpc.mockResolvedValue({ data: false, error: null });
+
+    const failure = await completeOutboxMessage({
+      outboxId: ids.conversation,
+      workerId: "worker-1",
+      providerMessageId: "wamid.fixture",
+    })
+      .then(() => null)
+      .catch((error: unknown) => error);
+
+    expect((failure as Error).message).toBe("whatsapp_outbox_complete_failed");
+    expect((failure as Error).cause).toBeUndefined();
   });
 
   it("commits a platform-owned tenant restart with the original inbound in one RPC", async () => {
