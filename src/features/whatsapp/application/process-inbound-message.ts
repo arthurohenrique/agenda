@@ -55,6 +55,11 @@ async function isStaleInteractiveReply(
   if (!message.providerReplyToId) return false;
   // Sem opção de pé não há escolha a proteger.
   if (conversation.context.options.length === 0) return false;
+  // Cada pergunta interativa vale um toque. Comparar com a última saída não
+  // basta: dois toques no mesmo balão chegam juntos, e quando o segundo é
+  // processado a resposta ao primeiro ainda está na fila, sem id do provedor —
+  // então o balão antigo ainda é a última saída conhecida e o toque passa.
+  if (conversation.context.answeredPromptId === message.providerReplyToId) return true;
   const latest = await findLatestOutboundProviderMessageId(conversation.id);
   // Última saída ainda sem id do provedor: sem base para comparar, deixa passar.
   if (!latest) return false;
@@ -73,11 +78,16 @@ function repeatCurrentPrompt(
       ...conversation.context,
       lastInboundMessageId: message.providerMessageId,
     }),
-    // Sem jargão e sem culpar o cliente: ele tocou num botão e espera avançar.
-    // Repetir a pergunta atual mostra onde ele está, com as opções à mão.
+    // Repetir a pergunta em silêncio parece bot travado: o cliente tocou e
+    // aparentemente nada mudou. Uma linha curta reconhece o toque e mostra onde
+    // ele está, sem falar em mensagem antiga nem em opção expirada — jargão que
+    // faz quem não é técnico achar que errou.
     responses: [
       repromptResponse(
-        conversation.context.prompt ?? "Vamos continuar de onde paramos.",
+        [
+          "Essa pergunta já foi respondida. Vamos continuar daqui:",
+          conversation.context.prompt ?? "",
+        ].filter(Boolean).join("\n\n"),
         conversation.context.options,
         capabilities.maxReplyButtons,
       ),
@@ -203,6 +213,11 @@ export async function processInboundMessage(
         lastInboundMessageId: message.providerMessageId,
         // Guarda a pergunta corrente para poder repeti-la ao cliente perdido.
         prompt: promptFromResponses(result.transition) ?? result.transition.context.prompt,
+        // Marca a pergunta como respondida para que um segundo toque no mesmo
+        // balão não avance de novo.
+        answeredPromptId: staleTap
+          ? transitionView.context.answeredPromptId
+          : message.providerReplyToId ?? result.transition.context.answeredPromptId,
       }),
       responses: sessionExpired
         ? [

@@ -99,6 +99,9 @@ export const conversationContextSchema = z.object({
   // Última pergunta feita ao cliente. Permite repeti-la quando ele toca num
   // botão de mensagem antiga, em vez de responder com um aviso técnico.
   prompt: z.string().max(1024).optional(),
+  // Mensagem cujo botão já foi consumido. Cada pergunta interativa vale um
+  // toque: sem isso, dois toques no mesmo balão avançam dois passos.
+  answeredPromptId: z.string().max(300).optional(),
 });
 
 export type ConversationContext = z.infer<typeof conversationContextSchema>;

@@ -379,11 +379,52 @@ describe("WhatsApp inbound processing", () => {
       expect(mocks.transitionConversation).not.toHaveBeenCalled();
       const committed = mocks.commitTransition.mock.calls[0]?.[0];
       expect(committed.transition.state).toBe("STAFF_SELECTION");
-      // Repete a pergunta com as opções, sem jargão e sem culpar o cliente.
-      expect(committed.transition.responses[0]).toMatchObject({
-        kind: "reply_buttons",
-        body: "Escolha o profissional:",
-      });
+      // Reconhece o toque e repete a pergunta, sem jargão e sem culpar o cliente.
+      expect(committed.transition.responses[0]).toMatchObject({ kind: "reply_buttons" });
+      expect(committed.transition.responses[0].body).toContain("já foi respondida");
+      expect(committed.transition.responses[0].body).toContain("Escolha o profissional:");
+    });
+
+    it("recusa o segundo toque no mesmo balão, mesmo antes de a resposta ser enviada", async () => {
+      // Caso real do print: dois toques quase simultâneos. Quando o segundo é
+      // processado, a resposta ao primeiro ainda está na fila sem id do
+      // provedor, então o balão antigo ainda é a última saída conhecida.
+      const answered = {
+        ...withOptions(),
+        context: conversationContextSchema.parse({
+          ...withOptions().context,
+          answeredPromptId: "wamid.pergunta",
+        }),
+      };
+      mocks.getOrCreateConversation.mockResolvedValue(answered);
+      mocks.lockConversation.mockResolvedValue(answered);
+      mocks.findLatestOutboundProviderMessageId.mockResolvedValue("wamid.pergunta");
+
+      await processInboundMessage(
+        { ...message, text: "2", providerReplyToId: "wamid.pergunta" },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).not.toHaveBeenCalled();
+    });
+
+    it("marca a pergunta como respondida ao consumir o primeiro toque", async () => {
+      mocks.getOrCreateConversation.mockResolvedValue(withOptions());
+      mocks.lockConversation.mockResolvedValue(withOptions());
+      mocks.findLatestOutboundProviderMessageId.mockResolvedValue("wamid.pergunta");
+
+      await processInboundMessage(
+        { ...message, text: "1", providerReplyToId: "wamid.pergunta" },
+        { maxReplyButtons: 3, maxListRows: 10 },
+        gateway(),
+        "worker-1",
+      );
+
+      expect(mocks.transitionConversation).toHaveBeenCalledOnce();
+      const committed = mocks.commitTransition.mock.calls[0]?.[0];
+      expect(committed.transition.context.answeredPromptId).toBe("wamid.pergunta");
     });
 
     it("processa normalmente o toque que responde à última pergunta", async () => {
