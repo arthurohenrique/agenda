@@ -3476,8 +3476,10 @@ cross join (values
 ) as fixture(id, message_id, key, body)
 where conversation.id = '95000000-0000-4000-8000-000000000003';
 
+-- `whatsapp_conversations_closed_check` amarra `closed_at` ao status terminal:
+-- terminal exige data, não terminal exige nulo.
 update public.whatsapp_conversations
-set status = 'completed'
+set status = 'completed', closed_at = statement_timestamp()
 where id = '95000000-0000-4000-8000-000000000003';
 select is(
   public.validate_whatsapp_outbox_delivery(
@@ -3501,7 +3503,7 @@ select ok(
 );
 
 update public.whatsapp_conversations
-set status = 'closed'
+set status = 'closed', closed_at = statement_timestamp()
 where id = '95000000-0000-4000-8000-000000000003';
 select is(
   public.validate_whatsapp_outbox_delivery(
@@ -3513,7 +3515,7 @@ select is(
 );
 
 update public.whatsapp_conversations
-set status = 'human_handoff'
+set status = 'human_handoff', closed_at = null
 where id = '95000000-0000-4000-8000-000000000003';
 select is(
   public.validate_whatsapp_outbox_delivery(
@@ -3539,7 +3541,7 @@ select ok(
 );
 
 update public.whatsapp_conversations
-set status = 'expired'
+set status = 'expired', closed_at = statement_timestamp()
 where id = '95000000-0000-4000-8000-000000000003';
 select is(
   public.validate_whatsapp_outbox_delivery(
