@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(173);
+select plan(179);
 
 select ok(
   not exists (
@@ -3392,6 +3392,158 @@ select ok(
     where rate_key = repeat('d', 64)
   ),
   'TTL preserva dados ativos e contato ainda ligado à identidade global'
+);
+
+-- Entrega da última resposta em terminais de sucesso (0026). A transição move a
+-- conversa e enfileira a resposta na mesma transação: sem aceitar `completed` e
+-- `closed`, toda confirmação, reagendamento e cancelamento era descartada.
+insert into public.whatsapp_messages (
+  id, conversation_id, tenant_id, provider, direction, message_type,
+  idempotency_key, status, content, normalized_content
+) values
+  (
+    '99700000-0000-4000-8000-000000000001',
+    '95000000-0000-4000-8000-000000000003',
+    null, 'mock', 'outbound', 'text',
+    'pgtap-terminal-completed', 'queued',
+    '{"text":"Agendamento confirmado"}', '{"text":"Agendamento confirmado"}'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000002',
+    '95000000-0000-4000-8000-000000000003',
+    null, 'mock', 'outbound', 'text',
+    'pgtap-terminal-closed', 'queued',
+    '{"text":"Fluxo cancelado"}', '{"text":"Fluxo cancelado"}'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000003',
+    '95000000-0000-4000-8000-000000000003',
+    null, 'mock', 'outbound', 'text',
+    'pgtap-terminal-handoff', 'queued',
+    '{"text":"Resposta obsoleta"}', '{"text":"Resposta obsoleta"}'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000004',
+    '95000000-0000-4000-8000-000000000003',
+    null, 'mock', 'outbound', 'text',
+    'pgtap-terminal-expired', 'queued',
+    '{"text":"Resposta tardia"}', '{"text":"Resposta tardia"}'
+  );
+
+insert into public.whatsapp_outbox (
+  id, tenant_id, phone_number_id, provider, conversation_id, message_id, recipient,
+  message_kind, payload, scheduled_for, next_attempt_at,
+  status, locked_by, locked_until
+) values
+  (
+    '99700000-0000-4000-8000-000000000011', null,
+    '91000000-0000-4000-8000-000000000001', 'mock',
+    '95000000-0000-4000-8000-000000000003',
+    '99700000-0000-4000-8000-000000000001', '+551199990004', 'text',
+    '{"recipient":"+551199990004","response":{"kind":"text","body":"Agendamento confirmado"},"idempotencyKey":"pgtap-terminal-completed","purpose":"conversation_reply"}',
+    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
+    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000012', null,
+    '91000000-0000-4000-8000-000000000001', 'mock',
+    '95000000-0000-4000-8000-000000000003',
+    '99700000-0000-4000-8000-000000000002', '+551199990004', 'text',
+    '{"recipient":"+551199990004","response":{"kind":"text","body":"Fluxo cancelado"},"idempotencyKey":"pgtap-terminal-closed","purpose":"conversation_reply"}',
+    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
+    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000013', null,
+    '91000000-0000-4000-8000-000000000001', 'mock',
+    '95000000-0000-4000-8000-000000000003',
+    '99700000-0000-4000-8000-000000000003', '+551199990004', 'text',
+    '{"recipient":"+551199990004","response":{"kind":"text","body":"Resposta obsoleta"},"idempotencyKey":"pgtap-terminal-handoff","purpose":"conversation_reply"}',
+    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
+    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+  ),
+  (
+    '99700000-0000-4000-8000-000000000014', null,
+    '91000000-0000-4000-8000-000000000001', 'mock',
+    '95000000-0000-4000-8000-000000000003',
+    '99700000-0000-4000-8000-000000000004', '+551199990004', 'text',
+    '{"recipient":"+551199990004","response":{"kind":"text","body":"Resposta tardia"},"idempotencyKey":"pgtap-terminal-expired","purpose":"conversation_reply"}',
+    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
+    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+  );
+
+update public.whatsapp_conversations
+set status = 'completed'
+where id = '95000000-0000-4000-8000-000000000003';
+select is(
+  public.validate_whatsapp_outbox_delivery(
+    '99700000-0000-4000-8000-000000000011',
+    'pgtap-terminal-worker'
+  ),
+  true,
+  'Conversa completed entrega a resposta que encerra o fluxo'
+);
+select ok(
+  (
+    select status = 'processing'
+    from public.whatsapp_outbox
+    where id = '99700000-0000-4000-8000-000000000011'
+  ) and (
+    select status = 'queued' and error_code is null
+    from public.whatsapp_messages
+    where id = '99700000-0000-4000-8000-000000000001'
+  ),
+  'Resposta terminal validada segue enviável, sem cancelamento nem ignore'
+);
+
+update public.whatsapp_conversations
+set status = 'closed'
+where id = '95000000-0000-4000-8000-000000000003';
+select is(
+  public.validate_whatsapp_outbox_delivery(
+    '99700000-0000-4000-8000-000000000012',
+    'pgtap-terminal-worker'
+  ),
+  true,
+  'Conversa closed entrega o aviso de fluxo cancelado'
+);
+
+update public.whatsapp_conversations
+set status = 'human_handoff'
+where id = '95000000-0000-4000-8000-000000000003';
+select is(
+  public.validate_whatsapp_outbox_delivery(
+    '99700000-0000-4000-8000-000000000013',
+    'pgtap-terminal-worker'
+  ),
+  false,
+  'Handoff continua bloqueando resposta automática antiga'
+);
+select ok(
+  (
+    select status = 'cancelled'
+      and last_error = 'conversation_delivery_invalidated'
+    from public.whatsapp_outbox
+    where id = '99700000-0000-4000-8000-000000000013'
+  ) and (
+    select status = 'ignored'
+      and error_code = 'conversation_delivery_invalidated'
+    from public.whatsapp_messages
+    where id = '99700000-0000-4000-8000-000000000003'
+  ),
+  'Resposta bloqueada por handoff segue cancelada e ignorada'
+);
+
+update public.whatsapp_conversations
+set status = 'expired'
+where id = '95000000-0000-4000-8000-000000000003';
+select is(
+  public.validate_whatsapp_outbox_delivery(
+    '99700000-0000-4000-8000-000000000014',
+    'pgtap-terminal-worker'
+  ),
+  false,
+  'Sessão expirada não envia resposta tardia'
 );
 
 select * from finish();
