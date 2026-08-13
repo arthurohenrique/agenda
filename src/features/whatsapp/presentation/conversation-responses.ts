@@ -123,6 +123,21 @@ export function listResponse(
   };
 }
 
+// Resposta a entrada inválida. O fluxo é por toque: mandar só texto deixa o
+// cliente sem nada para tocar, obrigando a rolar a conversa até os botões
+// anteriores. Reapresentar as opções junto da mensagem mantém a saída à mão.
+export function repromptResponse(
+  message: string,
+  options: readonly ConversationOption[],
+  maxReplyButtons: number,
+): ConversationResponse {
+  if (options.length === 0) return textResponse(message);
+  if (options.length <= maxReplyButtons) {
+    return replyButtonsResponse(message, options, maxReplyButtons);
+  }
+  return listResponse(message, "Ver opções", options);
+}
+
 export function bookingStartResponses(input: {
   emergencyNotice: string | null;
   administrativeNotice: string | null;

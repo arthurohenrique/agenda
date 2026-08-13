@@ -35,6 +35,7 @@ import {
   bookingStartResponses,
   listResponse,
   replyButtonsResponse,
+  repromptResponse,
   textResponse,
 } from "../presentation/conversation-responses";
 import { formatDateInTimezone, formatTimeInTimezone, localDateBounds } from "@/lib/dates";
@@ -551,7 +552,9 @@ function staffSelectionTransition(input: {
 async function staffPreferenceHandler(input: TransitionInput): Promise<ConversationTransition> {
   const option = optionForInput(input.conversation.context.options, input.message.text);
   if (!option || !["any", "choose"].includes(option.value)) {
-    return invalidOption(input, "Escolha qualquer profissional ou um nome específico.");
+    // A mensagem anterior convidava a digitar um nome, que este passo não
+    // aceita: `optionForInput` casa só pela chave da opção.
+    return invalidOption(input, "Toque em uma das opções abaixo.");
   }
   if (option.value === "any") return showDates(input, input.conversation.context, null);
   const { serviceId } = input.conversation.context.booking;
@@ -1175,10 +1178,22 @@ async function mainMenuHandler(input: TransitionInput): Promise<ConversationTran
 
 async function showMainMenu(input: TransitionInput): Promise<ConversationTransition> {
   if (!input.conversation.tenantId) return resolveTenantHandler(input);
+  // Oferecer atendimento humano onde o canal não o tem só produz uma opção que
+  // responde "não está disponível". O menu passa a espelhar a configuração.
+  const { humanHandoffEnabled } = await input.gateway.getTenantContext(
+    input.conversation.tenantId,
+  );
   const options: ConversationOption[] = [
     { key: "1", label: "Novo agendamento", value: "new_booking", kind: "action" },
     { key: "2", label: "Meus agendamentos", value: "upcoming", kind: "action" },
-    { key: "3", label: "Falar com atendente", value: "handoff", kind: "action" },
+    ...(humanHandoffEnabled
+      ? [{
+        key: "3",
+        label: "Falar com atendente",
+        value: "handoff",
+        kind: "action" as const,
+      }]
+      : []),
     { key: "9", label: "Trocar estabelecimento", value: "switch_tenant", kind: "action" },
   ];
   return {
@@ -1207,7 +1222,13 @@ async function invalidOption(input: TransitionInput, message: string): Promise<C
       ...context,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [text(configuredMessage ?? message)],
+    responses: [
+      repromptResponse(
+        configuredMessage ?? message,
+        input.conversation.context.options,
+        input.capabilities.maxReplyButtons,
+      ),
+    ],
   };
 }
 

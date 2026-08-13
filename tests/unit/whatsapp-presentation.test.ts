@@ -15,6 +15,7 @@ import {
   bookingStartResponses,
   listResponse,
   replyButtonsResponse,
+  repromptResponse,
   WHATSAPP_BUTTON_TITLE_MAX_LENGTH,
   WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH,
   WHATSAPP_LIST_ROW_TITLE_MAX_LENGTH,
@@ -216,6 +217,29 @@ describe("apresentação do WhatsApp", () => {
     );
 
     expect(tooLong).toEqual([]);
+  });
+
+  it("reapresenta as opções ao responder entrada inválida", () => {
+    // Só texto deixava o cliente sem nada para tocar: o fluxo é por botão.
+    const twoOptions = [
+      { key: "1", label: "Sem preferência", value: "any", kind: "action" as const },
+      { key: "2", label: "Quero escolher", value: "choose", kind: "action" as const },
+    ];
+    const manyOptions = Array.from({ length: 6 }, (_, index) => ({
+      key: String(index + 1),
+      label: `Serviço ${index + 1}`,
+      value: `service-${index + 1}`,
+      kind: "service" as const,
+    }));
+
+    const asButtons = repromptResponse("Toque em uma das opções abaixo.", twoOptions, 3);
+    const asList = repromptResponse("Escolha um serviço da lista.", manyOptions, 3);
+    const withoutOptions = repromptResponse("Informe um nome.", [], 3);
+
+    expect(asButtons.kind).toBe("reply_buttons");
+    expect(asList.kind).toBe("list");
+    // CUSTOMER_IDENTIFICATION espera texto livre e não tem opção a reapresentar.
+    expect(withoutOptions.kind).toBe("text");
   });
 
   it("preserva um prompt no limite mesmo quando avisos precisam ser omitidos", () => {
