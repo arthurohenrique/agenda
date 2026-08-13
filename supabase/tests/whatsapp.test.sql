@@ -3397,80 +3397,84 @@ select ok(
 -- Entrega da última resposta em terminais de sucesso (0026). A transição move a
 -- conversa e enfileira a resposta na mesma transação: sem aceitar `completed` e
 -- `closed`, toda confirmação, reagendamento e cancelamento era descartada.
+-- `tenant_id` vem da conversa: o FK composto (conversation_id, tenant_id) exige
+-- que casem, e testes anteriores podem ter alterado o vínculo dela.
 insert into public.whatsapp_messages (
   id, conversation_id, tenant_id, provider, direction, message_type,
   idempotency_key, status, content, normalized_content
-) values
-  (
-    '99700000-0000-4000-8000-000000000001',
-    '95000000-0000-4000-8000-000000000003',
-    null, 'mock', 'outbound', 'text',
-    'pgtap-terminal-completed', 'queued',
-    '{"text":"Agendamento confirmado"}', '{"text":"Agendamento confirmado"}'
-  ),
-  (
-    '99700000-0000-4000-8000-000000000002',
-    '95000000-0000-4000-8000-000000000003',
-    null, 'mock', 'outbound', 'text',
-    'pgtap-terminal-closed', 'queued',
-    '{"text":"Fluxo cancelado"}', '{"text":"Fluxo cancelado"}'
-  ),
-  (
-    '99700000-0000-4000-8000-000000000003',
-    '95000000-0000-4000-8000-000000000003',
-    null, 'mock', 'outbound', 'text',
-    'pgtap-terminal-handoff', 'queued',
-    '{"text":"Resposta obsoleta"}', '{"text":"Resposta obsoleta"}'
-  ),
-  (
-    '99700000-0000-4000-8000-000000000004',
-    '95000000-0000-4000-8000-000000000003',
-    null, 'mock', 'outbound', 'text',
-    'pgtap-terminal-expired', 'queued',
-    '{"text":"Resposta tardia"}', '{"text":"Resposta tardia"}'
-  );
+)
+select
+  fixture.id,
+  conversation.id,
+  conversation.tenant_id,
+  'mock',
+  'outbound',
+  'text',
+  fixture.key,
+  'queued',
+  jsonb_build_object('text', fixture.body),
+  jsonb_build_object('text', fixture.body)
+from public.whatsapp_conversations conversation
+cross join (values
+  ('99700000-0000-4000-8000-000000000001'::uuid, 'pgtap-terminal-completed', 'Agendamento confirmado'),
+  ('99700000-0000-4000-8000-000000000002'::uuid, 'pgtap-terminal-closed', 'Fluxo cancelado'),
+  ('99700000-0000-4000-8000-000000000003'::uuid, 'pgtap-terminal-handoff', 'Resposta obsoleta'),
+  ('99700000-0000-4000-8000-000000000004'::uuid, 'pgtap-terminal-expired', 'Resposta tardia')
+) as fixture(id, key, body)
+where conversation.id = '95000000-0000-4000-8000-000000000003';
 
+-- `locked_at` é obrigatório junto de `locked_until` e `locked_by`:
+-- `whatsapp_outbox_lock_check` recusa lock parcial.
 insert into public.whatsapp_outbox (
   id, tenant_id, phone_number_id, provider, conversation_id, message_id, recipient,
   message_kind, payload, scheduled_for, next_attempt_at,
-  status, locked_by, locked_until
-) values
+  status, locked_at, locked_by, locked_until
+)
+select
+  fixture.id,
+  conversation.tenant_id,
+  '91000000-0000-4000-8000-000000000001',
+  'mock',
+  conversation.id,
+  fixture.message_id,
+  '+551199990004',
+  'text',
+  jsonb_build_object(
+    'recipient', '+551199990004',
+    'response', jsonb_build_object('kind', 'text', 'body', fixture.body),
+    'idempotencyKey', fixture.key,
+    'purpose', 'conversation_reply'
+  ),
+  '2000-01-01 00:00:00+00',
+  '2000-01-01 00:00:00+00',
+  'processing',
+  statement_timestamp(),
+  'pgtap-terminal-worker',
+  statement_timestamp() + interval '5 minutes'
+from public.whatsapp_conversations conversation
+cross join (values
   (
-    '99700000-0000-4000-8000-000000000011', null,
-    '91000000-0000-4000-8000-000000000001', 'mock',
-    '95000000-0000-4000-8000-000000000003',
-    '99700000-0000-4000-8000-000000000001', '+551199990004', 'text',
-    '{"recipient":"+551199990004","response":{"kind":"text","body":"Agendamento confirmado"},"idempotencyKey":"pgtap-terminal-completed","purpose":"conversation_reply"}',
-    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
-    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+    '99700000-0000-4000-8000-000000000011'::uuid,
+    '99700000-0000-4000-8000-000000000001'::uuid,
+    'pgtap-terminal-completed', 'Agendamento confirmado'
   ),
   (
-    '99700000-0000-4000-8000-000000000012', null,
-    '91000000-0000-4000-8000-000000000001', 'mock',
-    '95000000-0000-4000-8000-000000000003',
-    '99700000-0000-4000-8000-000000000002', '+551199990004', 'text',
-    '{"recipient":"+551199990004","response":{"kind":"text","body":"Fluxo cancelado"},"idempotencyKey":"pgtap-terminal-closed","purpose":"conversation_reply"}',
-    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
-    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+    '99700000-0000-4000-8000-000000000012'::uuid,
+    '99700000-0000-4000-8000-000000000002'::uuid,
+    'pgtap-terminal-closed', 'Fluxo cancelado'
   ),
   (
-    '99700000-0000-4000-8000-000000000013', null,
-    '91000000-0000-4000-8000-000000000001', 'mock',
-    '95000000-0000-4000-8000-000000000003',
-    '99700000-0000-4000-8000-000000000003', '+551199990004', 'text',
-    '{"recipient":"+551199990004","response":{"kind":"text","body":"Resposta obsoleta"},"idempotencyKey":"pgtap-terminal-handoff","purpose":"conversation_reply"}',
-    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
-    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
+    '99700000-0000-4000-8000-000000000013'::uuid,
+    '99700000-0000-4000-8000-000000000003'::uuid,
+    'pgtap-terminal-handoff', 'Resposta obsoleta'
   ),
   (
-    '99700000-0000-4000-8000-000000000014', null,
-    '91000000-0000-4000-8000-000000000001', 'mock',
-    '95000000-0000-4000-8000-000000000003',
-    '99700000-0000-4000-8000-000000000004', '+551199990004', 'text',
-    '{"recipient":"+551199990004","response":{"kind":"text","body":"Resposta tardia"},"idempotencyKey":"pgtap-terminal-expired","purpose":"conversation_reply"}',
-    '2000-01-01 00:00:00+00', '2000-01-01 00:00:00+00',
-    'processing', 'pgtap-terminal-worker', statement_timestamp() + interval '5 minutes'
-  );
+    '99700000-0000-4000-8000-000000000014'::uuid,
+    '99700000-0000-4000-8000-000000000004'::uuid,
+    'pgtap-terminal-expired', 'Resposta tardia'
+  )
+) as fixture(id, message_id, key, body)
+where conversation.id = '95000000-0000-4000-8000-000000000003';
 
 update public.whatsapp_conversations
 set status = 'completed'

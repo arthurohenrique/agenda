@@ -3,6 +3,10 @@ import type { ConversationResponse } from "../domain/provider";
 
 export const WHATSAPP_TEXT_BODY_MAX_LENGTH = 4096;
 export const WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH = 1024;
+// Limites do WhatsApp para rótulos interativos. Rótulo estático deve caber sem
+// truncagem; o corte existe para conteúdo dinâmico, como nome de serviço.
+export const WHATSAPP_BUTTON_TITLE_MAX_LENGTH = 20;
+export const WHATSAPP_LIST_ROW_TITLE_MAX_LENGTH = 24;
 
 type TextResponse = Extract<ConversationResponse, { kind: "text" }>;
 type ReplyButtonsResponse = Extract<ConversationResponse, { kind: "reply_buttons" }>;
@@ -85,7 +89,10 @@ export function replyButtonsResponse(
       body: truncateBody(body, WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH),
       buttons: options.map((option) => ({
         id: option.key,
-        title: option.label.slice(0, 20),
+        // `slice` cru cortava no meio da palavra sem sinalizar: "Qualquer
+        // profissional" chegava como "Qualquer profissiona". A reticência
+        // deixa o corte explícito para o cliente.
+        title: truncateBody(option.label, WHATSAPP_BUTTON_TITLE_MAX_LENGTH),
       })),
     } satisfies ReplyButtonsResponse;
   }
@@ -109,7 +116,7 @@ export function listResponse(
         title: "Opções",
         rows: options.map((option) => ({
           id: option.key,
-          title: option.label.slice(0, 24),
+          title: truncateBody(option.label, WHATSAPP_LIST_ROW_TITLE_MAX_LENGTH),
         })),
       },
     ],

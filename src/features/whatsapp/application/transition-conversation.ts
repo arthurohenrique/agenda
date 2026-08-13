@@ -147,7 +147,7 @@ function tenantOptions(
   });
   return [
     ...visible,
-    { key: "9", label: "Escolher outro estabelecimento", value: "search", kind: "action" },
+    { key: "9", label: "Buscar outro", value: "search", kind: "action" },
   ];
 }
 
@@ -331,7 +331,7 @@ async function resolveTenantHandler(input: TransitionInput): Promise<Conversatio
     if (!tenant) throw new Error("tenant_history_invalid");
     const options: ConversationOption[] = [
       { key: "1", label: "Sim", value: tenant.id, kind: "tenant" },
-      { key: "9", label: "Escolher outro estabelecimento", value: "search", kind: "action" },
+      { key: "9", label: "Buscar outro", value: "search", kind: "action" },
     ];
     return {
       state: "TENANT_CONFIRMATION",
@@ -486,8 +486,8 @@ async function serviceHandler(input: TransitionInput): Promise<ConversationTrans
         profileName: input.contact.profileName,
       });
   const options: ConversationOption[] = [
-    { key: "1", label: "Qualquer profissional", value: "any", kind: "action" },
-    { key: "2", label: "Escolher profissional", value: "choose", kind: "action" },
+    { key: "1", label: "Sem preferência", value: "any", kind: "action" },
+    { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
   ];
   const context = conversationContextSchema.parse({
     ...input.conversation.context,
@@ -693,8 +693,8 @@ async function slotHandler(input: TransitionInput): Promise<ConversationTransiti
     if (!tenantId) throw new Error("conversation_tenant_missing");
     const tenant = await input.gateway.getTenantContext(tenantId);
     const options: ConversationOption[] = [
-      { key: "1", label: "Confirmar reagendamento", value: "confirm", kind: "action" },
-      { key: "2", label: "Escolher outro horário", value: "change_slot", kind: "action" },
+      { key: "1", label: "Confirmar", value: "confirm", kind: "action" },
+      { key: "2", label: "Outro horário", value: "change_slot", kind: "action" },
       { key: "3", label: "Voltar ao menu", value: "cancel", kind: "action" },
     ];
     return {
@@ -749,8 +749,8 @@ async function customerHandler(input: TransitionInput): Promise<ConversationTran
   const booking = { ...input.conversation.context.booking, customerName };
   if (!booking.startsAt || !booking.serviceName) throw new Error("conversation_booking_context_invalid");
   const options: ConversationOption[] = [
-    { key: "1", label: "Confirmar agendamento", value: "confirm", kind: "action" },
-    { key: "2", label: "Escolher outro horário", value: "change_slot", kind: "action" },
+    { key: "1", label: "Confirmar", value: "confirm", kind: "action" },
+    { key: "2", label: "Outro horário", value: "change_slot", kind: "action" },
     { key: "3", label: "Cancelar", value: "cancel", kind: "action" },
   ];
   const summary = [
@@ -999,7 +999,7 @@ async function upcomingActionHandler(input: TransitionInput): Promise<Conversati
   if (option.value === "reschedule") return showRescheduleDates(input);
   if (option.value === "cancel_booking") {
     const options: ConversationOption[] = [
-      { key: "1", label: "Confirmar cancelamento", value: "confirm_cancel", kind: "action" },
+      { key: "1", label: "Sim, cancelar", value: "confirm_cancel", kind: "action" },
       { key: "2", label: "Voltar", value: "back", kind: "action" },
     ];
     return {
@@ -1349,7 +1349,7 @@ export async function transitionConversation(input: TransitionInput): Promise<{
             }]
           : [{
               key: "9",
-              label: "Escolher outro estabelecimento",
+              label: "Buscar outro",
               value: "search",
               kind: "action" as const,
             }]),

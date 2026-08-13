@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildWhatsAppBookingLink,
@@ -13,7 +15,9 @@ import {
   bookingStartResponses,
   listResponse,
   replyButtonsResponse,
+  WHATSAPP_BUTTON_TITLE_MAX_LENGTH,
   WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH,
+  WHATSAPP_LIST_ROW_TITLE_MAX_LENGTH,
 } from "@/features/whatsapp/presentation/conversation-responses";
 import {
   whatsappSimulatorInputSchema,
@@ -163,6 +167,55 @@ describe("apresentação do WhatsApp", () => {
       expect(response.body).toHaveLength(WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH);
       expect(response.body.endsWith("…")).toBe(true);
     }
+  });
+
+  it("sinaliza o corte de rótulo dinâmico em vez de cortar no meio da palavra", () => {
+    // `slice` cru entregava "Qualquer profissiona" ao cliente, sem indicar corte.
+    const options = [{
+      key: "1",
+      label: "Corte masculino com barba completa",
+      value: "00000000-0000-4000-8000-000000000001",
+      kind: "service" as const,
+    }];
+
+    const asButtons = replyButtonsResponse("Escolha", options, 3);
+    const asList = listResponse("Escolha", "Ver", options);
+
+    expect(asButtons.kind).toBe("reply_buttons");
+    if (asButtons.kind === "reply_buttons") {
+      const [button] = asButtons.buttons;
+      expect(button?.title).toHaveLength(WHATSAPP_BUTTON_TITLE_MAX_LENGTH);
+      expect(button?.title.endsWith("…")).toBe(true);
+    }
+
+    const [row] = asList.sections[0]?.rows ?? [];
+    expect(row?.title).toHaveLength(WHATSAPP_LIST_ROW_TITLE_MAX_LENGTH);
+    expect(row?.title.endsWith("…")).toBe(true);
+  });
+
+  it("mantém todo rótulo estático de botão dentro do limite do WhatsApp", async () => {
+    // Rótulo estático truncado é defeito de redação, não de conteúdo: o cliente
+    // via "Confirmar agendament" e "Escolher outro horár".
+    const source = await readFile(
+      resolve(
+        process.cwd(),
+        "src/features/whatsapp/application/transition-conversation.ts",
+      ),
+      "utf8",
+    );
+    const labels = [...source.matchAll(/label: "([^"]+)"/g)]
+      .map(([, label]) => label)
+      .filter((label): label is string => Boolean(label));
+
+    expect(labels.length).toBeGreaterThan(10);
+    // O menu principal passa de três opções e vira texto numerado, sem limite de
+    // botão; "Trocar estabelecimento" é o único rótulo que depende disso.
+    const buttonLabels = labels.filter((label) => label !== "Trocar estabelecimento");
+    const tooLong = buttonLabels.filter(
+      (label) => label.length > WHATSAPP_BUTTON_TITLE_MAX_LENGTH,
+    );
+
+    expect(tooLong).toEqual([]);
   });
 
   it("preserva um prompt no limite mesmo quando avisos precisam ser omitidos", () => {
