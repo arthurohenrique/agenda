@@ -104,6 +104,39 @@ describe("Supabase WhatsApp booking scope", () => {
     });
   });
 
+  it("consulta o contexto do tenant uma vez por mensagem recebida", async () => {
+    // A máquina de estados pede o contexto em treze pontos, e cada chamada
+    // custa duas consultas. A instância do gateway vive uma mensagem só.
+    const tenantQuery = queryBuilder({
+      data: {
+        id: ids.tenant,
+        slug: "tenant",
+        name: "Tenant",
+        timezone: "America/Sao_Paulo",
+        locations: [{ id: ids.primaryLocation, is_primary: true }],
+      },
+      error: null,
+    });
+    const settingsQuery = queryBuilder(settings({}));
+    mocks.from.mockImplementation((table: string) =>
+      table === "tenants" ? tenantQuery : settingsQuery);
+
+    const gateway = new SupabaseWhatsAppBookingGateway();
+    const [first, second, third] = await Promise.all([
+      gateway.getTenantContext(ids.tenant),
+      gateway.getTenantContext(ids.tenant),
+      gateway.getTenantContext(ids.tenant),
+    ]);
+
+    expect(first).toEqual(second);
+    expect(second).toEqual(third);
+    expect(mocks.from.mock.calls.filter(([table]) => table === "tenants")).toHaveLength(1);
+
+    // Instância nova é mensagem nova: não pode reaproveitar contexto antigo.
+    await new SupabaseWhatsAppBookingGateway().getTenantContext(ids.tenant);
+    expect(mocks.from.mock.calls.filter(([table]) => table === "tenants")).toHaveLength(2);
+  });
+
   it("fails closed when configured location metadata is invalid", async () => {
     const tenantQuery = queryBuilder({
       data: {

@@ -239,7 +239,24 @@ export function whatsappIdempotencyKey(...parts: string[]): string {
 }
 
 export class SupabaseWhatsAppBookingGateway implements WhatsAppBookingGateway {
-  async getTenantContext(tenantId: string): Promise<BookingTenantContext> {
+  // Treze pontos da máquina de estados pedem o contexto do tenant, e cada
+  // chamada custa duas consultas. Uma instância do gateway vive exatamente uma
+  // mensagem recebida, então guardar a promessa aqui elimina as repetições sem
+  // arriscar servir dado velho entre mensagens. Guardar a promessa, e não o
+  // valor, também funde chamadas concorrentes numa ida só.
+  private readonly tenantContexts = new Map<string, Promise<BookingTenantContext>>();
+
+  getTenantContext(tenantId: string): Promise<BookingTenantContext> {
+    const cached = this.tenantContexts.get(tenantId);
+    if (cached) return cached;
+    const pending = this.loadTenantContext(tenantId);
+    this.tenantContexts.set(tenantId, pending);
+    // Falha não fica memorizada: a próxima tentativa refaz a consulta.
+    void pending.catch(() => this.tenantContexts.delete(tenantId));
+    return pending;
+  }
+
+  private async loadTenantContext(tenantId: string): Promise<BookingTenantContext> {
     const admin = createAdminClient();
     const [{ data, error }, settings] = await Promise.all([
       admin
