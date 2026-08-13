@@ -1,18 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  after: vi.fn(),
   getConfig: vi.fn(),
   getReadiness: vi.fn(),
   consumeRateLimit: vi.fn(),
   fingerprint: vi.fn(),
+  loggerError: vi.fn(),
   loggerInfo: vi.fn(),
   loggerWarn: vi.fn(),
   normalizeWebhook: vi.fn(),
+  processInbox: vi.fn(),
+  processOutbox: vi.fn(),
   resolveProvider: vi.fn(),
   storeEnvelope: vi.fn(),
   validateSignature: vi.fn(),
 }));
 
+// `after` só existe dentro do escopo de request do Next; o teste captura o callback
+// para executá-lo explicitamente e observar o dreno pós-resposta.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: mocks.after,
+}));
+vi.mock("@/features/whatsapp/application/process-inbox", () => ({
+  processWhatsAppInbox: mocks.processInbox,
+}));
+vi.mock("@/features/whatsapp/application/process-outbox", () => ({
+  processWhatsAppOutbox: mocks.processOutbox,
+}));
 vi.mock("@/features/whatsapp/config", () => ({
   getWhatsAppConfig: mocks.getConfig,
 }));
@@ -32,11 +48,15 @@ vi.mock("@/lib/rate-limit", () => ({
   requestFingerprint: mocks.fingerprint,
 }));
 vi.mock("@/lib/observability/logger", () => ({
-  logger: { info: mocks.loggerInfo, warn: mocks.loggerWarn },
+  logger: {
+    error: mocks.loggerError,
+    info: mocks.loggerInfo,
+    warn: mocks.loggerWarn,
+  },
 }));
 
 import { NextRequest } from "next/server";
-import { GET, POST } from "@/app/api/integrations/whatsapp/webhook/route";
+import { GET, POST, runtime } from "@/app/api/integrations/whatsapp/webhook/route";
 
 const verifyToken = "local-verification-token";
 
@@ -79,7 +99,14 @@ describe("WhatsApp webhook route", () => {
       duplicate: false,
       correlationId: "97100000-0000-4000-8000-000000000001",
     });
+    mocks.processInbox.mockResolvedValue({ claimed: 1, processed: 1, failed: 0 });
+    mocks.processOutbox.mockResolvedValue({ claimed: 1, sent: 1, failed: 0 });
   });
+
+  async function runScheduledDrain() {
+    const callback = mocks.after.mock.calls.at(-1)?.[0] as () => Promise<void>;
+    await callback();
+  }
 
   it("returns the challenge only for the configured verification token", async () => {
     const accepted = await GET(new NextRequest(
@@ -92,6 +119,38 @@ describe("WhatsApp webhook route", () => {
     expect(accepted.status).toBe(200);
     expect(await accepted.text()).toBe("challenge-123");
     expect(rejected.status).toBe(403);
+  });
+
+  it("exposes both handlers on the Node runtime required by HMAC and the workers", () => {
+    expect(typeof GET).toBe("function");
+    expect(typeof POST).toBe("function");
+    expect(runtime).toBe("nodejs");
+  });
+
+  it("refuses verification when hub.mode is not subscribe", async () => {
+    const response = await GET(new NextRequest(
+      `http://localhost/api/integrations/whatsapp/webhook?hub.mode=unsubscribe&hub.verify_token=${verifyToken}&hub.challenge=challenge-123`,
+    ));
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("challenge-123");
+  });
+
+  it("refuses verification when the challenge is absent", async () => {
+    const response = await GET(new NextRequest(
+      `http://localhost/api/integrations/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=${verifyToken}`,
+    ));
+
+    expect(response.status).toBe(403);
+  });
+
+  it("refuses verification when no verify token is configured", async () => {
+    mocks.getConfig.mockReturnValueOnce({ webhookVerifyToken: null });
+    const response = await GET(new NextRequest(
+      "http://localhost/api/integrations/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=&hub.challenge=challenge-123",
+    ));
+
+    expect(response.status).toBe(403);
   });
 
   it("rate limits verification attempts before comparing the token", async () => {
@@ -174,6 +233,16 @@ describe("WhatsApp webhook route", () => {
     );
   });
 
+  it("refuses deliveries while the channel is misconfigured, before any signature work", async () => {
+    mocks.getReadiness.mockReturnValueOnce({ channel: { status: "misconfigured" } });
+    const response = await POST(postRequest('{"entry":[]}'));
+
+    expect(response.status).toBe(503);
+    expect(mocks.validateSignature).not.toHaveBeenCalled();
+    expect(mocks.storeEnvelope).not.toHaveBeenCalled();
+    expect(mocks.after).not.toHaveBeenCalled();
+  });
+
   it("rejects an invalid signature before parsing or persistence", async () => {
     mocks.validateSignature.mockResolvedValueOnce(false);
     const response = await POST(postRequest("not-json"));
@@ -229,5 +298,77 @@ describe("WhatsApp webhook route", () => {
       duplicate: true,
     });
     expect(mocks.storeEnvelope).toHaveBeenCalledOnce();
+  });
+
+  it("stores an unknown payload shape instead of failing the delivery", async () => {
+    mocks.normalizeWebhook.mockResolvedValueOnce([{
+      kind: "unknown",
+      provider: "mock",
+      eventId: "unknown:unsupported-change",
+      externalPhoneNumberId: null,
+      externalWabaId: null,
+      occurredAt: "2026-07-31T12:00:00.000Z",
+      reason: "unsupported_change",
+    }]);
+
+    const response = await POST(postRequest('{"object":"unexpected","field":1}'));
+
+    expect(response.status).toBe(200);
+    expect(mocks.storeEnvelope).toHaveBeenCalledWith(expect.objectContaining({
+      payload: { object: "unexpected", field: 1 },
+      signatureValid: true,
+    }));
+  });
+
+  it("processes the inbox and outbox only after the response is scheduled", async () => {
+    const response = await POST(postRequest('{"entry":[]}'));
+
+    expect(response.status).toBe(200);
+    expect(mocks.processInbox).not.toHaveBeenCalled();
+    expect(mocks.after).toHaveBeenCalledOnce();
+
+    await runScheduledDrain();
+
+    expect(mocks.processInbox).toHaveBeenCalledWith(expect.objectContaining({
+      limit: 5,
+      workerId: "webhook:97100000-0000-4000-8000-000000000001",
+    }));
+    expect(mocks.processOutbox).toHaveBeenCalledWith(expect.objectContaining({
+      limit: 5,
+      workerId: "webhook:97100000-0000-4000-8000-000000000001",
+    }));
+  });
+
+  it("drains the outbox even when inbox processing fails, leaving retry to the inbox", async () => {
+    mocks.processInbox.mockRejectedValueOnce(new Error("whatsapp_inbox_claim_failed"));
+    await POST(postRequest('{"entry":[]}'));
+    await runScheduledDrain();
+
+    expect(mocks.processOutbox).toHaveBeenCalledOnce();
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      "whatsapp_webhook_inbox_drain_failed",
+      expect.objectContaining({ result: "deferred_to_recovery" }),
+    );
+  });
+
+  it("does not reject the delivery when the scheduled drain fails entirely", async () => {
+    mocks.processInbox.mockRejectedValueOnce(new Error("whatsapp_inbox_claim_failed"));
+    mocks.processOutbox.mockRejectedValueOnce(new Error("whatsapp_outbox_claim_failed"));
+    const response = await POST(postRequest('{"entry":[]}'));
+
+    await expect(runScheduledDrain()).resolves.toBeUndefined();
+    expect(response.status).toBe(200);
+  });
+
+  it("schedules a drain for a duplicate so an unprocessed backlog still recovers", async () => {
+    mocks.storeEnvelope.mockResolvedValueOnce({
+      id: "97000000-0000-4000-8000-000000000001",
+      duplicate: true,
+      correlationId: "97100000-0000-4000-8000-000000000001",
+    });
+    await POST(postRequest('{"entry":[]}'));
+    await runScheduledDrain();
+
+    expect(mocks.processInbox).toHaveBeenCalledOnce();
   });
 });

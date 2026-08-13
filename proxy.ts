@@ -6,7 +6,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // O webhook da Meta é público, sem cookie e sem sessão. Mantê-lo fora do proxy
+  // evita refresh de sessão, reescrita de cabeçalhos e latência no caminho quente.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif)$).*)",
+    "/((?!api/integrations/whatsapp/webhook|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif)$).*)",
   ],
 };

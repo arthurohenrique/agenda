@@ -1,8 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { processWhatsAppInbox } from "@/features/whatsapp/application/process-inbox";
+import { processWhatsAppOutbox } from "@/features/whatsapp/application/process-outbox";
 import { getWhatsAppOrdering } from "@/features/whatsapp/application/webhook-ordering";
 import { getWhatsAppConfig } from "@/features/whatsapp/config";
+import type { WhatsAppProvider } from "@/features/whatsapp/domain/provider";
+import { classifyWhatsAppError } from "@/features/whatsapp/domain/errors";
 import { resolveWhatsAppProvider } from "@/features/whatsapp/infrastructure/providers/resolver";
 import { storeWebhookEnvelope } from "@/features/whatsapp/infrastructure/repositories/channel-repository";
 import {
@@ -13,7 +17,13 @@ import { getWhatsAppReadiness } from "@/features/whatsapp/readiness";
 import { logger } from "@/lib/observability/logger";
 import { requestFingerprint } from "@/lib/rate-limit";
 
+// node:crypto e os workers exigem runtime Node; a inferência automática não deve
+// promover esta rota para Edge.
+export const runtime = "nodejs";
+
 const MAX_WEBHOOK_BYTES = 1_048_576;
+// Lote pequeno: o dreno roda depois da resposta, dentro do orçamento da função.
+const DRAIN_BATCH_SIZE = 5;
 const challengeSchema = z.string().min(1).max(1024);
 const envelopeSchema = z.record(z.string(), z.unknown());
 
@@ -88,6 +98,38 @@ async function readWebhookBody(request: NextRequest): Promise<Uint8Array> {
     offset += chunk.byteLength;
   }
   return body;
+}
+
+// Drena a inbox e a outbox depois que a Meta já recebeu 200. O lote não é escopado
+// ao evento recém-gravado de propósito: a mesma passada processa o evento atual e
+// recupera o backlog cujo next_attempt_at já venceu. A inbox persistida no Supabase
+// continua sendo a fonte de verdade — se a função morrer aqui, o evento permanece
+// reivindicável, com backoff e dead letter aplicados pelas funções de claim.
+async function drainWhatsAppQueues(
+  provider: WhatsAppProvider,
+  correlationId: string,
+): Promise<void> {
+  const workerId = `webhook:${correlationId}`;
+  try {
+    await processWhatsAppInbox({ provider, limit: DRAIN_BATCH_SIZE, workerId });
+  } catch (error) {
+    logger.error("whatsapp_webhook_inbox_drain_failed", {
+      correlationId,
+      errorCode: classifyWhatsAppError(error).code,
+      operation: "receive_webhook",
+      result: "deferred_to_recovery",
+    });
+  }
+  try {
+    await processWhatsAppOutbox({ provider, limit: DRAIN_BATCH_SIZE, workerId });
+  } catch (error) {
+    logger.error("whatsapp_webhook_outbox_drain_failed", {
+      correlationId,
+      errorCode: classifyWhatsAppError(error).code,
+      operation: "receive_webhook",
+      result: "deferred_to_recovery",
+    });
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -186,6 +228,7 @@ export async function POST(request: NextRequest) {
     operation: "receive_webhook",
     result: stored.duplicate ? "duplicate" : "queued",
   });
+  after(() => drainWhatsAppQueues(provider, stored.correlationId));
   return NextResponse.json(
     { received: true, duplicate: stored.duplicate, correlationId: stored.correlationId },
     { status: 200, headers: { "Cache-Control": "no-store" } },

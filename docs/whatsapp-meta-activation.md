@@ -67,6 +67,26 @@ credencial antiga depois de confirmar tráfego com a nova.
 O endpoint não deve executar todo o diálogo antes de responder. Eventos desconhecidos
 devem entrar na inbox com acesso restrito e terminar como ignorados, sem quebrar lote.
 
+### Processamento e recuperação
+
+`POST /api/integrations/whatsapp/webhook` grava o envelope na inbox e responde `200`
+imediatamente. O diálogo roda depois da resposta, em `after()` do Next, drenando inbox e
+outbox em lotes pequenos. A inbox persistida no Supabase é a fonte de verdade: se a
+função morrer durante o dreno, o evento continua reivindicável e as funções de claim
+aplicam backoff exponencial, `next_attempt_at` e dead letter após 8 tentativas.
+
+Como cada entrega da Meta dispara um dreno não escopado, o próprio tráfego recupera o
+backlog vencido — não há dependência de Vercel Cron frequente. Para backlog sem tráfego
+novo (dead letter, incidente, janela ociosa), acione manualmente ou por agendador
+externo, com o bearer do worker:
+
+- `POST /api/internal/whatsapp/process-inbox`
+- `POST /api/internal/whatsapp/process-outbox`
+
+- [ ] Confirmar dreno pós-resposta em `after()` sem bloquear o `200`.
+- [ ] Confirmar recuperação de backlog na entrega seguinte.
+- [ ] Definir responsável por acionar os workers internos em incidente.
+
 ## 4. Mensagens e templates
 
 - [ ] Receber mensagem pelo número de teste.
