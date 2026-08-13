@@ -99,7 +99,7 @@ describe("WhatsApp webhook route", () => {
       duplicate: false,
       correlationId: "97100000-0000-4000-8000-000000000001",
     });
-    mocks.processInbox.mockResolvedValue({ claimed: 1, processed: 1, failed: 0 });
+    mocks.processInbox.mockResolvedValue({ claimed: 0, processed: 0, failed: 0 });
     mocks.processOutbox.mockResolvedValue({ claimed: 1, sent: 1, failed: 0 });
   });
 
@@ -360,7 +360,22 @@ describe("WhatsApp webhook route", () => {
     expect(response.status).toBe(200);
   });
 
-  it("schedules a drain for a duplicate so an unprocessed backlog still recovers", async () => {
+  it("retries the inbox when the fresh envelope is blocked by an in-flight predecessor", async () => {
+    // A Meta entrega status em rajada: o dreno do segundo evento encontra o
+    // primeiro em voo e a trava de ordem recusa a reivindicação. Sendo o último
+    // da rajada, ele não teria entrega seguinte para recuperá-lo.
+    mocks.processInbox
+      .mockResolvedValueOnce({ claimed: 0, processed: 0, failed: 0 })
+      .mockResolvedValueOnce({ claimed: 1, processed: 1, failed: 0 });
+
+    await POST(postRequest('{"entry":[]}'));
+    await runScheduledDrain();
+
+    expect(mocks.processInbox).toHaveBeenCalledTimes(3);
+    expect(mocks.processOutbox).toHaveBeenCalledOnce();
+  });
+
+  it("stops after a single pass when a duplicate finds nothing to claim", async () => {
     mocks.storeEnvelope.mockResolvedValueOnce({
       id: "97000000-0000-4000-8000-000000000001",
       duplicate: true,
@@ -369,6 +384,17 @@ describe("WhatsApp webhook route", () => {
     await POST(postRequest('{"entry":[]}'));
     await runScheduledDrain();
 
+    // Duplicata não garante fila pendente: repetir seria desperdício.
     expect(mocks.processInbox).toHaveBeenCalledOnce();
+    expect(mocks.processOutbox).toHaveBeenCalledOnce();
+  });
+
+  it("caps the retries so the post-response work stays bounded", async () => {
+    mocks.processInbox.mockResolvedValue({ claimed: 1, processed: 1, failed: 0 });
+
+    await POST(postRequest('{"entry":[]}'));
+    await runScheduledDrain();
+
+    expect(mocks.processInbox).toHaveBeenCalledTimes(3);
   });
 });

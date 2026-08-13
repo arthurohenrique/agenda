@@ -24,6 +24,10 @@ export const runtime = "nodejs";
 const MAX_WEBHOOK_BYTES = 1_048_576;
 // Lote pequeno: o dreno roda depois da resposta, dentro do orçamento da função.
 const DRAIN_BATCH_SIZE = 5;
+// Teto de passadas e espera entre elas: no pior caso somam pouco mais de um
+// segundo depois da resposta, sem competir com o pg_cron que cobre a cauda.
+const MAX_DRAIN_PASSES = 3;
+const DRAIN_RETRY_DELAY_MS = 750;
 const challengeSchema = z.string().min(1).max(1024);
 const envelopeSchema = z.record(z.string(), z.unknown());
 
@@ -100,18 +104,43 @@ async function readWebhookBody(request: NextRequest): Promise<Uint8Array> {
   return body;
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 // Drena a inbox e a outbox depois que a Meta já recebeu 200. O lote não é escopado
 // ao evento recém-gravado de propósito: a mesma passada processa o evento atual e
 // recupera o backlog cujo next_attempt_at já venceu. A inbox persistida no Supabase
 // continua sendo a fonte de verdade — se a função morrer aqui, o evento permanece
 // reivindicável, com backoff e dead letter aplicados pelas funções de claim.
+//
+// A passada é repetida porque `claim_whatsapp_webhook_events` recusa um evento
+// enquanto existir predecessor não processado com chave de ordenação em comum. A
+// Meta entrega status em rajada — dois eventos da mesma conversa chegam com décimos
+// de segundo de diferença — então o dreno do segundo encontra o primeiro em voo,
+// não reivindica nada e termina. Sem uma nova passada, esse evento só seria
+// recuperado pela próxima entrega; sendo ele o último da rajada, ficaria parado.
+// `expectPending` distingue o envelope recém-gravado de uma duplicata, cuja fila
+// pode legitimamente estar vazia.
 async function drainWhatsAppQueues(
   provider: WhatsAppProvider,
   correlationId: string,
+  expectPending: boolean,
 ): Promise<void> {
   const workerId = `webhook:${correlationId}`;
   try {
-    await processWhatsAppInbox({ provider, limit: DRAIN_BATCH_SIZE, workerId });
+    for (let pass = 1; pass <= MAX_DRAIN_PASSES; pass += 1) {
+      const { claimed } = await processWhatsAppInbox({
+        provider,
+        limit: DRAIN_BATCH_SIZE,
+        workerId,
+      });
+      // Uma passada produtiva pode ter destravado sucessores bloqueados; uma
+      // primeira passada vazia com envelope novo indica exatamente o bloqueio.
+      const worthRetrying = claimed > 0 || (pass === 1 && expectPending);
+      if (!worthRetrying || pass === MAX_DRAIN_PASSES) break;
+      await delay(DRAIN_RETRY_DELAY_MS);
+    }
   } catch (error) {
     logger.error("whatsapp_webhook_inbox_drain_failed", {
       correlationId,
@@ -228,7 +257,7 @@ export async function POST(request: NextRequest) {
     operation: "receive_webhook",
     result: stored.duplicate ? "duplicate" : "queued",
   });
-  after(() => drainWhatsAppQueues(provider, stored.correlationId));
+  after(() => drainWhatsAppQueues(provider, stored.correlationId, !stored.duplicate));
   return NextResponse.json(
     { received: true, duplicate: stored.duplicate, correlationId: stored.correlationId },
     { status: 200, headers: { "Cache-Control": "no-store" } },
