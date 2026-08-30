@@ -115,6 +115,14 @@ flowchart LR
   O --> P
 ```
 
+O motor de conversa tem dois modos por estabelecimento, escolhidos no onboarding e
+editáveis no painel: `buttons`, em que o cliente toca em botões e listas, e `text`, em
+que nada é interativo e cada mensagem passa por um parser determinístico
+(`domain/intent/`, puro e sem I/O) antes do handler do estado. O parser preenche o
+rascunho da reserva e o fluxo salta para a primeira lacuna; a disponibilidade continua
+vindo das mesmas RPCs. O parser só roda nos estados de agendamento — nunca onde o
+texto é nome, busca ou confirmação — e o modo `buttons` não o executa.
+
 O primeiro estágio usa provedor mock. A conta Meta, aplicativo, WABA, número real,
 webhook remoto e templates aprovados continuam pendentes. A interface global expõe
 essa diferença e não apresenta o canal real como ativo.

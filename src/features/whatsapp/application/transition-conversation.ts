@@ -13,6 +13,7 @@ import {
   type ConversationTransition,
   type PersistedConversation,
 } from "../domain/conversation";
+import type { WhatsAppInteractionMode } from "../domain/interaction-mode";
 import type { ConversationResponse } from "../domain/provider";
 import {
   attachContactToTenant,
@@ -24,9 +25,12 @@ import {
 } from "./resolve-tenant";
 import {
   whatsappIdempotencyKey,
+  type AvailableSlot,
+  type BookingTenantContext,
   type WhatsAppBookingGateway,
 } from "./booking-gateway";
 import { isExplicitOptOut, recordOptOut } from "./messaging-policy";
+import { handleTextModeMessage, type TextModeSteps } from "./text-mode";
 import {
   type WhatsAppContact,
   type WhatsAppPhoneNumber,
@@ -34,11 +38,13 @@ import {
 import {
   bookingStartResponses,
   listResponse,
+  presentOptions,
   replyButtonsResponse,
   repromptResponse,
   textResponse,
 } from "../presentation/conversation-responses";
 import { formatDateInTimezone, formatTimeInTimezone, localDateBounds } from "@/lib/dates";
+import { normalizeCommand } from "@/lib/text/normalize";
 
 export interface InboundConversationMessage {
   provider: string;
@@ -80,13 +86,38 @@ function buttons(
   return replyButtonsResponse(body, options, maxReplyButtons);
 }
 
-function normalizedCommand(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR")
-    .trim()
-    .replace(/[.!?]+$/g, "");
+// Modo de interação do estabelecimento da conversa. Sem tenant ainda não há
+// preferência a aplicar, e a etapa de escolha do estabelecimento segue com
+// botões. O contexto é memoizado por mensagem no gateway; falha em lê-lo não
+// derruba um comando que nem precisa dele.
+async function interactionModeFor(
+  input: Pick<TransitionInput, "gateway" | "conversation">,
+  tenantId: string | null = input.conversation.tenantId,
+): Promise<WhatsAppInteractionMode> {
+  if (!tenantId) return "buttons";
+  try {
+    return (await input.gateway.getTenantContext(tenantId)).interactionMode;
+  } catch {
+    return "buttons";
+  }
+}
+
+function present(
+  mode: WhatsAppInteractionMode,
+  body: string,
+  options: readonly ConversationOption[],
+  maxReplyButtons: number,
+  listButtonText?: string,
+  hint?: string | null,
+): ConversationResponse {
+  return presentOptions({
+    mode,
+    body,
+    options,
+    maxReplyButtons,
+    ...(listButtonText === undefined ? {} : { listButtonText }),
+    ...(hint === undefined ? {} : { hint }),
+  });
 }
 
 function tenantLabel(tenant: TenantCandidate): string {
@@ -192,6 +223,7 @@ function tenantSelectionTransition(input: {
 function serviceSelectionTransition(input: {
   message: InboundConversationMessage;
   capabilities: ConversationCapabilities;
+  mode: WhatsAppInteractionMode;
   services: Awaited<ReturnType<WhatsAppBookingGateway["listServices"]>>;
   context: ConversationContext;
   offset?: number;
@@ -219,10 +251,13 @@ function serviceSelectionTransition(input: {
       lastPromptAt: new Date().toISOString(),
     }),
     responses: [
-      listResponse(
+      present(
+        input.mode,
         input.greeting ?? "Qual serviço deseja agendar?",
-        "Escolher serviço",
         options,
+        input.capabilities.maxReplyButtons,
+        "Escolher serviço",
+        "Responda com o número do serviço.",
       ),
     ],
   };
@@ -290,6 +325,7 @@ async function startBookingForTenant(
   const transition = serviceSelectionTransition({
     message: input.message,
     capabilities: input.capabilities,
+    mode: channel.interactionMode,
     services,
     context: conversationContextSchema.parse({
       ...input.conversation.context,
@@ -311,6 +347,8 @@ async function startBookingForTenant(
       prompt: "Qual serviço deseja agendar?",
       buttonText: "Escolher serviço",
       options: transition.context.options,
+      mode: channel.interactionMode,
+      hint: "Responda com o número do serviço.",
     }),
   };
 }
@@ -468,6 +506,7 @@ async function serviceHandler(input: TransitionInput): Promise<ConversationTrans
     return serviceSelectionTransition({
       message: input.message,
       capabilities: input.capabilities,
+      mode: await interactionModeFor(input),
       services: await input.gateway.listServices(input.conversation.tenantId),
       context: input.conversation.context,
       offset,
@@ -486,10 +525,6 @@ async function serviceHandler(input: TransitionInput): Promise<ConversationTrans
         tenantId: input.conversation.tenantId,
         profileName: input.contact.profileName,
       });
-  const options: ConversationOption[] = [
-    { key: "1", label: "Sem preferência", value: "any", kind: "action" },
-    { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
-  ];
   const context = conversationContextSchema.parse({
     ...input.conversation.context,
     customerId: customer?.customerId ?? input.conversation.context.customerId,
@@ -500,19 +535,37 @@ async function serviceHandler(input: TransitionInput): Promise<ConversationTrans
       serviceId: service.id,
       serviceName: service.name,
     },
-    options,
     lastInboundMessageId: input.message.providerMessageId,
   });
   if (!service.allowStaffSelection) return showDates(input, context, null);
+  return staffPreferenceTransition(input, context, await interactionModeFor(input));
+}
+
+function staffPreferenceTransition(
+  input: TransitionInput,
+  baseContext: ConversationContext,
+  mode: WhatsAppInteractionMode,
+): ConversationTransition {
+  const options: ConversationOption[] = [
+    { key: "1", label: "Sem preferência", value: "any", kind: "action" },
+    { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
+  ];
   return {
     state: "STAFF_PREFERENCE",
     status: "waiting_customer",
-    context,
+    context: conversationContextSchema.parse({
+      ...baseContext,
+      options,
+      lastInboundMessageId: input.message.providerMessageId,
+    }),
     responses: [
-      buttons(
+      present(
+        mode,
         "Tem preferência de profissional?",
         options,
         input.capabilities.maxReplyButtons,
+        undefined,
+        "Responda 1 ou 2.",
       ),
     ],
   };
@@ -521,6 +574,7 @@ async function serviceHandler(input: TransitionInput): Promise<ConversationTrans
 function staffSelectionTransition(input: {
   message: InboundConversationMessage;
   capabilities: ConversationCapabilities;
+  mode: WhatsAppInteractionMode;
   staff: Awaited<ReturnType<WhatsAppBookingGateway["listStaff"]>>;
   context: ConversationContext;
   offset?: number;
@@ -545,16 +599,30 @@ function staffSelectionTransition(input: {
       options,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [listResponse("Escolha o profissional:", "Ver profissionais", options)],
+    responses: [
+      present(
+        input.mode,
+        "Escolha o profissional:",
+        options,
+        input.capabilities.maxReplyButtons,
+        "Ver profissionais",
+        "Responda com o número do profissional.",
+      ),
+    ],
   };
 }
 
 async function staffPreferenceHandler(input: TransitionInput): Promise<ConversationTransition> {
   const option = optionForInput(input.conversation.context.options, input.message.text);
   if (!option || !["any", "choose"].includes(option.value)) {
-    // A mensagem anterior convidava a digitar um nome, que este passo não
-    // aceita: `optionForInput` casa só pela chave da opção.
-    return invalidOption(input, "Toque em uma das opções abaixo.");
+    // No modo botões este passo casa só pela chave da opção; no modo texto o
+    // rótulo por extenso já foi convertido em chave antes de chegar aqui.
+    return invalidOption(
+      input,
+      (await interactionModeFor(input)) === "text"
+        ? "Responda 1 para sem preferência ou 2 para escolher."
+        : "Toque em uma das opções abaixo.",
+    );
   }
   if (option.value === "any") return showDates(input, input.conversation.context, null);
   const { serviceId } = input.conversation.context.booking;
@@ -564,6 +632,7 @@ async function staffPreferenceHandler(input: TransitionInput): Promise<Conversat
   return staffSelectionTransition({
     message: input.message,
     capabilities: input.capabilities,
+    mode: await interactionModeFor(input),
     staff,
     context: input.conversation.context,
   });
@@ -580,6 +649,7 @@ async function staffHandler(input: TransitionInput): Promise<ConversationTransit
     return staffSelectionTransition({
       message: input.message,
       capabilities: input.capabilities,
+      mode: await interactionModeFor(input),
       staff: await input.gateway.listStaff(input.conversation.tenantId, serviceId),
       context: input.conversation.context,
       offset,
@@ -629,7 +699,16 @@ async function showDates(
       options,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [listResponse("Qual data funciona melhor?", "Escolher data", options)],
+    responses: [
+      present(
+        tenant.interactionMode,
+        "Qual data funciona melhor?",
+        options,
+        input.capabilities.maxReplyButtons,
+        "Escolher data",
+        "Responda com o número da data.",
+      ),
+    ],
   };
 }
 
@@ -659,8 +738,30 @@ async function dateHandler(input: TransitionInput): Promise<ConversationTransiti
       responses: [text("Não encontrei horários nessa data. Escolha outra opção da lista.")],
     };
   }
-  const maxSlots = Math.min(8, input.capabilities.maxListRows - 1);
-  const options: ConversationOption[] = slots.slice(0, Math.max(1, maxSlots)).map((slot, index) => ({
+  return slotSelectionTransition({
+    input,
+    context: input.conversation.context,
+    tenant,
+    date: option.value,
+    slots,
+    prompt: "Escolha um horário:",
+  });
+}
+
+// Lista de horários de um dia. Serve à criação e ao reagendamento; só o texto
+// da pergunta muda. O valor da opção carrega o horário inteiro para que o
+// próximo passo não precise consultar de novo.
+function slotSelectionTransition(input: {
+  input: TransitionInput;
+  context: ConversationContext;
+  tenant: BookingTenantContext;
+  date: string;
+  slots: readonly AvailableSlot[];
+  prompt: string;
+}): ConversationTransition {
+  const { tenant } = input;
+  const maxSlots = Math.min(8, input.input.capabilities.maxListRows - 1);
+  const options: ConversationOption[] = input.slots.slice(0, Math.max(1, maxSlots)).map((slot, index) => ({
     key: String(index + 1),
     label: `${formatTimeInTimezone(slot.startAt, tenant.timezone)} · ${slot.staffName}`,
     value: `${slot.startAt}|${slot.endAt}|${slot.staffId}|${slot.staffName}`,
@@ -671,12 +772,21 @@ async function dateHandler(input: TransitionInput): Promise<ConversationTransiti
     state: "SLOT_SELECTION",
     status: "waiting_customer",
     context: conversationContextSchema.parse({
-      ...input.conversation.context,
-      booking: { ...input.conversation.context.booking, date: option.value },
+      ...input.context,
+      booking: { ...input.context.booking, date: input.date },
       options,
-      lastInboundMessageId: input.message.providerMessageId,
+      lastInboundMessageId: input.input.message.providerMessageId,
     }),
-    responses: [listResponse("Escolha um horário:", "Ver horários", options)],
+    responses: [
+      present(
+        tenant.interactionMode,
+        input.prompt,
+        options,
+        input.input.capabilities.maxReplyButtons,
+        "Ver horários",
+        "Responda com o número do horário.",
+      ),
+    ],
   };
 }
 
@@ -691,51 +801,67 @@ async function slotHandler(input: TransitionInput): Promise<ConversationTransiti
   const [startsAt, endsAt, staffId, ...staffNameParts] = option.value.split("|");
   const staffName = staffNameParts.join("|");
   if (!startsAt || !endsAt || !staffId || !staffName) throw new Error("slot_option_invalid");
-  if (input.conversation.context.booking.operation === "reschedule") {
+  const context = conversationContextSchema.parse({
+    ...input.conversation.context,
+    booking: {
+      ...input.conversation.context.booking,
+      startsAt,
+      endsAt,
+      staffId,
+      staffName,
+    },
+  });
+  if (context.booking.operation === "reschedule") {
     const tenantId = input.conversation.tenantId;
     if (!tenantId) throw new Error("conversation_tenant_missing");
     const tenant = await input.gateway.getTenantContext(tenantId);
-    const options: ConversationOption[] = [
-      { key: "1", label: "Confirmar", value: "confirm", kind: "action" },
-      { key: "2", label: "Outro horário", value: "change_slot", kind: "action" },
-      { key: "3", label: "Voltar ao menu", value: "cancel", kind: "action" },
-    ];
-    return {
-      state: "BOOKING_CONFIRMATION",
-      status: "waiting_customer",
-      context: conversationContextSchema.parse({
-        ...input.conversation.context,
-        booking: {
-          ...input.conversation.context.booking,
-          startsAt,
-          endsAt,
-          staffId,
-          staffName,
-        },
-        options,
-        lastInboundMessageId: input.message.providerMessageId,
-      }),
-      responses: [
-        buttons(
-          `Reagendar para ${formatDateInTimezone(startsAt, tenant.timezone)}, às ${formatTimeInTimezone(startsAt, tenant.timezone)}, com ${staffName}?`,
-          options,
-          input.capabilities.maxReplyButtons,
-        ),
-      ],
-    };
+    return rescheduleConfirmationTransition(input, context, tenant);
   }
+  return customerIdentificationTransition(input, context);
+}
+
+// Horário escolhido para reagendar: `context.booking` já traz o slot.
+function rescheduleConfirmationTransition(
+  input: TransitionInput,
+  context: ConversationContext,
+  tenant: BookingTenantContext,
+): ConversationTransition {
+  const { startsAt, staffName } = context.booking;
+  if (!startsAt || !staffName) throw new Error("conversation_reschedule_context_invalid");
+  const options: ConversationOption[] = [
+    { key: "1", label: "Confirmar", value: "confirm", kind: "action" },
+    { key: "2", label: "Outro horário", value: "change_slot", kind: "action" },
+    { key: "3", label: "Voltar ao menu", value: "cancel", kind: "action" },
+  ];
+  return {
+    state: "BOOKING_CONFIRMATION",
+    status: "waiting_customer",
+    context: conversationContextSchema.parse({
+      ...context,
+      options,
+      lastInboundMessageId: input.message.providerMessageId,
+    }),
+    responses: [
+      present(
+        tenant.interactionMode,
+        `Reagendar para ${formatDateInTimezone(startsAt, tenant.timezone)}, às ${formatTimeInTimezone(startsAt, tenant.timezone)}, com ${staffName}?`,
+        options,
+        input.capabilities.maxReplyButtons,
+      ),
+    ],
+  };
+}
+
+// Horário escolhido para criar: `context.booking` já traz o slot.
+function customerIdentificationTransition(
+  input: TransitionInput,
+  context: ConversationContext,
+): ConversationTransition {
   return {
     state: "CUSTOMER_IDENTIFICATION",
     status: "waiting_customer",
     context: conversationContextSchema.parse({
-      ...input.conversation.context,
-      booking: {
-        ...input.conversation.context.booking,
-        startsAt,
-        endsAt,
-        staffId,
-        staffName,
-      },
+      ...context,
       options: [],
       lastInboundMessageId: input.message.providerMessageId,
     }),
@@ -749,8 +875,26 @@ async function customerHandler(input: TransitionInput): Promise<ConversationTran
   const tenantId = input.conversation.tenantId;
   if (!tenantId) throw new Error("conversation_tenant_missing");
   const tenant = await input.gateway.getTenantContext(tenantId);
-  const booking = { ...input.conversation.context.booking, customerName };
-  if (!booking.startsAt || !booking.serviceName) throw new Error("conversation_booking_context_invalid");
+  return bookingReviewTransition(
+    input,
+    conversationContextSchema.parse({
+      ...input.conversation.context,
+      booking: { ...input.conversation.context.booking, customerName },
+    }),
+    tenant,
+  );
+}
+
+// Resumo antes de confirmar: `context.booking` já traz slot e nome.
+function bookingReviewTransition(
+  input: TransitionInput,
+  context: ConversationContext,
+  tenant: BookingTenantContext,
+): ConversationTransition {
+  const { booking } = context;
+  if (!booking.startsAt || !booking.serviceName || !booking.customerName) {
+    throw new Error("conversation_booking_context_invalid");
+  }
   const options: ConversationOption[] = [
     { key: "1", label: "Confirmar", value: "confirm", kind: "action" },
     { key: "2", label: "Outro horário", value: "change_slot", kind: "action" },
@@ -763,18 +907,19 @@ async function customerHandler(input: TransitionInput): Promise<ConversationTran
     `Data: ${formatDateInTimezone(booking.startsAt, tenant.timezone)}`,
     `Horário: ${formatTimeInTimezone(booking.startsAt, tenant.timezone)}`,
     `Profissional: ${booking.staffName ?? "Qualquer profissional"}`,
-    `Nome: ${customerName}`,
+    `Nome: ${booking.customerName}`,
   ].join("\n");
   return {
     state: "BOOKING_CONFIRMATION",
     status: "waiting_customer",
     context: conversationContextSchema.parse({
-      ...input.conversation.context,
-      booking,
+      ...context,
       options,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [buttons(summary, options, input.capabilities.maxReplyButtons)],
+    responses: [
+      present(tenant.interactionMode, summary, options, input.capabilities.maxReplyButtons),
+    ],
   };
 }
 
@@ -969,7 +1114,15 @@ async function showUpcomingBookings(
       options,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [listResponse("Escolha um agendamento:", "Ver agendamentos", options)],
+    responses: [
+      present(
+        tenant.interactionMode,
+        "Escolha um agendamento:",
+        options,
+        input.capabilities.maxReplyButtons,
+        "Ver agendamentos",
+      ),
+    ],
   };
 }
 
@@ -978,6 +1131,7 @@ async function upcomingActionHandler(input: TransitionInput): Promise<Conversati
   if (!option) return invalidOption(input, "Escolha uma opção da lista.");
   const offset = pageOffset(option, "upcoming");
   if (offset !== null) return showUpcomingBookings(input, offset);
+  const mode = await interactionModeFor(input);
   const appointmentId = input.conversation.context.booking.appointmentId;
   if (!appointmentId) {
     const options: ConversationOption[] = [
@@ -995,7 +1149,7 @@ async function upcomingActionHandler(input: TransitionInput): Promise<Conversati
         lastInboundMessageId: input.message.providerMessageId,
       }),
       responses: [
-        buttons("O que deseja fazer?", options, input.capabilities.maxReplyButtons),
+        present(mode, "O que deseja fazer?", options, input.capabilities.maxReplyButtons),
       ],
     };
   }
@@ -1014,7 +1168,8 @@ async function upcomingActionHandler(input: TransitionInput): Promise<Conversati
         lastInboundMessageId: input.message.providerMessageId,
       }),
       responses: [
-        buttons(
+        present(
+          mode,
           "Deseja cancelar este agendamento?",
           options,
           input.capabilities.maxReplyButtons,
@@ -1102,7 +1257,16 @@ async function showRescheduleDates(input: TransitionInput): Promise<Conversation
       options,
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [listResponse("Escolha a nova data:", "Ver datas", options)],
+    responses: [
+      present(
+        tenant.interactionMode,
+        "Escolha a nova data:",
+        options,
+        input.capabilities.maxReplyButtons,
+        "Ver datas",
+        "Responda com o número da data.",
+      ),
+    ],
   };
 }
 
@@ -1124,26 +1288,14 @@ async function rescheduleDateHandler(input: TransitionInput): Promise<Conversati
     staffId: null,
   });
   if (slots.length === 0) return invalidOption(input, "Não há horários nessa data. Escolha outra.");
-  const options: ConversationOption[] = slots
-    .slice(0, Math.max(1, Math.min(8, input.capabilities.maxListRows - 1)))
-    .map((slot, index) => ({
-      key: String(index + 1),
-      label: `${formatTimeInTimezone(slot.startAt, tenant.timezone)} · ${slot.staffName}`,
-      value: `${slot.startAt}|${slot.endAt}|${slot.staffId}|${slot.staffName}`,
-      kind: "slot",
-    }));
-  options.push({ key: "9", label: "Escolher outra data", value: "other_date", kind: "action" });
-  return {
-    state: "SLOT_SELECTION",
-    status: "waiting_customer",
-    context: conversationContextSchema.parse({
-      ...input.conversation.context,
-      booking: { ...input.conversation.context.booking, date: option.value },
-      options,
-      lastInboundMessageId: input.message.providerMessageId,
-    }),
-    responses: [listResponse("Escolha o novo horário:", "Ver horários", options)],
-  };
+  return slotSelectionTransition({
+    input,
+    context: input.conversation.context,
+    tenant,
+    date: option.value,
+    slots,
+    prompt: "Escolha o novo horário:",
+  });
 }
 
 async function mainMenuHandler(input: TransitionInput): Promise<ConversationTransition> {
@@ -1212,8 +1364,8 @@ async function showMainMenu(input: TransitionInput): Promise<ConversationTransit
 async function invalidOption(input: TransitionInput, message: string): Promise<ConversationTransition> {
   const { attempts, context } = nextAttempt(input.conversation.context, input.conversation.currentState);
   if (attempts >= 3) return handoffTransition({ ...input, conversation: { ...input.conversation, context } }, "repeated_invalid_input");
-  const configuredMessage = input.conversation.tenantId
-    ? (await input.gateway.getTenantContext(input.conversation.tenantId)).unknownMessageResponse
+  const channel = input.conversation.tenantId
+    ? await input.gateway.getTenantContext(input.conversation.tenantId)
     : null;
   return {
     state: input.conversation.currentState,
@@ -1224,9 +1376,10 @@ async function invalidOption(input: TransitionInput, message: string): Promise<C
     }),
     responses: [
       repromptResponse(
-        configuredMessage ?? message,
+        channel?.unknownMessageResponse ?? message,
         input.conversation.context.options,
         input.capabilities.maxReplyButtons,
+        channel?.interactionMode ?? "buttons",
       ),
     ],
   };
@@ -1304,7 +1457,7 @@ export async function transitionConversation(input: TransitionInput): Promise<{
   transition: ConversationTransition;
 }> {
   const conversation = input.conversation;
-  const command = normalizedCommand(input.message.text);
+  const command = normalizeCommand(input.message.text);
   if (isExplicitOptOut(input.message.text) && conversation.tenantId) {
     await recordOptOut({
       contactId: input.contact.id,
@@ -1390,7 +1543,8 @@ export async function transitionConversation(input: TransitionInput): Promise<{
             lastInboundMessageId: input.message.providerMessageId,
           }),
           responses: [
-            buttons(
+            present(
+              await interactionModeFor(input),
               `Deseja trocar para ${resolution.tenant.name}?`,
               options,
               input.capabilities.maxReplyButtons,
@@ -1459,9 +1613,41 @@ export async function transitionConversation(input: TransitionInput): Promise<{
       },
     };
   }
+  // Modo texto: frase interpretada vira transição; rótulo por extenso vira a
+  // chave da opção e segue para o handler do estado, que casa só pela chave.
+  const handled = await handleTextModeMessage({ ...input, conversation }, textModeSteps);
+  if (handled && "transition" in handled) return { conversation, transition: handled.transition };
   const handler = handlers[conversation.currentState] ?? resolveTenantHandler;
   return {
     conversation,
-    transition: await handler({ ...input, conversation }),
+    transition: await handler({ ...(handled?.input ?? input), conversation }),
   };
 }
+
+const textModeSteps: TextModeSteps = {
+  serviceSelection: (input, context, services, greeting) => serviceSelectionTransition({
+    message: input.message,
+    capabilities: input.capabilities,
+    mode: "text",
+    services: [...services],
+    context,
+    ...(greeting === undefined ? {} : { greeting }),
+  }),
+  staffPreference: (input, context) => staffPreferenceTransition(input, context, "text"),
+  staffSelection: (input, context, staff) => staffSelectionTransition({
+    message: input.message,
+    capabilities: input.capabilities,
+    mode: "text",
+    staff: [...staff],
+    context,
+  }),
+  showDates,
+  slotSelection: (input, context, tenant, date, slots, prompt) =>
+    slotSelectionTransition({ input, context, tenant, date, slots, prompt }),
+  customerIdentification: customerIdentificationTransition,
+  bookingReview: bookingReviewTransition,
+  rescheduleConfirmation: rescheduleConfirmationTransition,
+  showRescheduleDates,
+  handoff: handoffTransition,
+  showUpcomingBookings: (input) => showUpcomingBookings(input),
+};

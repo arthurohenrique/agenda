@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  parseWhatsAppInteractionMode,
+  type WhatsAppInteractionMode,
+} from "../domain/interaction-mode";
+
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -42,6 +47,7 @@ export interface BookingTenantContext {
   unknownMessageResponse: string | null;
   administrativeNotice: string | null;
   emergencyNotice: string | null;
+  interactionMode: WhatsAppInteractionMode;
 }
 
 export interface CreateBookingInput {
@@ -80,6 +86,10 @@ export interface WhatsAppBookingGateway {
   getTenantContext(tenantId: string): Promise<BookingTenantContext>;
   listServices(tenantId: string): Promise<ServiceOption[]>;
   listStaff(tenantId: string, serviceId: string): Promise<StaffOption[]>;
+  // Todos os profissionais públicos do estabelecimento, sem filtrar por
+  // serviço. O modo texto precisa reconhecer "com a Maria" antes de saber o
+  // serviço; a compatibilidade é verificada depois com `listStaff`.
+  listAllStaff(tenantId: string): Promise<StaffOption[]>;
   getAvailableSlots(input: {
     tenant: BookingTenantContext;
     serviceId: string;
@@ -157,6 +167,7 @@ async function loadBookingSettings(tenantId: string): Promise<{
   unknownMessageResponse: string | null;
   administrativeNotice: string | null;
   emergencyNotice: string | null;
+  interactionMode: WhatsAppInteractionMode;
 }> {
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -178,6 +189,7 @@ async function loadBookingSettings(tenantId: string): Promise<{
     unknownMessageResponse: optionalNotice(settings.unknown_message_response),
     administrativeNotice: optionalNotice(settings.metadata.administrative_notice),
     emergencyNotice: optionalNotice(settings.metadata.emergency_notice),
+    interactionMode: parseWhatsAppInteractionMode(settings.metadata.interaction_mode),
   };
 }
 
@@ -287,6 +299,7 @@ export class SupabaseWhatsAppBookingGateway implements WhatsAppBookingGateway {
       unknownMessageResponse: settings.unknownMessageResponse,
       administrativeNotice: settings.administrativeNotice,
       emergencyNotice: settings.emergencyNotice,
+      interactionMode: settings.interactionMode,
     };
   }
 
@@ -332,6 +345,20 @@ export class SupabaseWhatsAppBookingGateway implements WhatsAppBookingGateway {
       .order("name");
     if (error) throw new Error("staff_query_failed");
     return z.array(staffSchema.passthrough()).parse(data ?? []).map(({ id, name }) => ({ id, name }));
+  }
+
+  async listAllStaff(tenantId: string): Promise<StaffOption[]> {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("staff")
+      .select("id, name")
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .eq("is_public", true)
+      .order("sort_order")
+      .order("name");
+    if (error) throw new Error("staff_query_failed");
+    return z.array(staffSchema).parse(data ?? []);
   }
 
   async getAvailableSlots(input: {

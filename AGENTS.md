@@ -128,6 +128,16 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
   índice único de idempotência. Não crie agendador novo.
 - Política de envio central em `application/messaging-policy.ts` (janela de 24 h,
   opt-in por categoria, template aprovado). Nenhum envio deve contorná-la.
+- Modo de interação por tenant em `tenant_whatsapp_settings.metadata.interaction_mode`
+  (`buttons` | `text`), lido em `BookingTenantContext.interactionMode`. Toda pergunta
+  com opções passa por `presentOptions` (`presentation/conversation-responses.ts`):
+  em `text` nunca sai `reply_buttons`/`list`. O modo texto vive em
+  `application/text-mode.ts` (parser puro em `domain/intent/`, integrado num único
+  ponto de `transitionConversation`, só nos `INTENT_CAPABLE_STATES`; nunca em nome,
+  busca ou sim/não). Em `buttons` o parser não roda. Não adicione um segundo parser
+  nem chame LLM: a decisão registrada é regra determinística.
+- Normalização pt-BR (acentos, caixa, pontuação) em `src/lib/text/normalize.ts`.
+  Não reimplemente NFD inline.
 
 ### Armadilhas conhecidas
 
@@ -142,6 +152,8 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
   `database-and-e2e` falhava em `npx supabase start` desde `33a7ad4` por causa da regra
   de lista `INTO` do PL/pgSQL. Ao adicionar função nova, confirme que a migration aplica
   de fato; typecheck e teste unitário não cobrem nada disso.
+- O seed tem quatro tenants; o quarto (`estudio-texto`, código `TEXT01`) está em modo
+  texto para o e2e. Contagens de tenants publicados em teste devem considerar isso.
 - Docker costuma estar ausente no ambiente local. `supabase test db`, integração e E2E
   não rodam aqui — declare explicitamente o que não foi executado (o CI cobre).
 - `secret_reference`, `payload` de webhook e `flow_token_hash` ficam **fora** dos

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Building2, Check, Clock3, MapPin, Palette, Sparkles, UserRound } from "lucide-react";
+import { Building2, Check, Clock3, MapPin, MessageCircleMore, Palette, Sparkles, UserRound } from "lucide-react";
 import {
   completeOnboardingAction,
   type OnboardingState,
@@ -11,6 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { normalizeSlug } from "@/lib/slugs";
 import { cn } from "@/lib/utils";
+
+const interactionModes = [
+  {
+    value: "buttons",
+    label: "Botões e listas",
+    hint: "O cliente toca nas opções. Texto digitado em uma pergunta de escolha só repete as opções.",
+  },
+  {
+    value: "text",
+    label: "Somente texto",
+    hint: "Sem botões. O bot entende frases como “quero agendar corte sexta às 14h com a Maria” e pergunta em texto o que faltar.",
+  },
+] as const;
 
 const segments = [
   { value: "barbershop", label: "Barbearia", hint: "Corte e barba" },
@@ -34,6 +47,7 @@ export function OnboardingForm() {
   const initialState: OnboardingState = { status: "idle" };
   const [state, action] = useActionState(completeOnboardingAction, initialState);
   const [segment, setSegment] = useState<(typeof segments)[number]["value"]>("barbershop");
+  const [interactionMode, setInteractionMode] = useState<(typeof interactionModes)[number]["value"]>("buttons");
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
@@ -114,6 +128,41 @@ export function OnboardingForm() {
         </div>
         <div className="mt-6 max-w-xl"><Field error={state.fields?.staffName?.[0]} hint="Será associado a todos os serviços iniciais. Você poderá editar depois." label="Nome" name="staffName" required /></div>
         <p className="mt-5 inline-flex items-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600"><Sparkles aria-hidden="true" size={17} /> Serviços do segmento serão criados como dados editáveis.</p>
+      </section>
+
+      <section className="surface p-6 sm:p-8" aria-labelledby="whatsapp-title">
+        <div className="flex items-start gap-4">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700"><MessageCircleMore aria-hidden="true" size={21} /></span>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Atendimento por WhatsApp</p><h2 className="mt-1 text-xl font-bold" id="whatsapp-title">Como o cliente responde ao bot</h2></div>
+        </div>
+        <fieldset className="mt-6 grid gap-3 sm:grid-cols-2">
+          <legend className="sr-only">Modo de interação do WhatsApp</legend>
+          {interactionModes.map((item) => (
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition",
+                interactionMode === item.value
+                  ? "border-[var(--primary)] bg-zinc-50 shadow-sm"
+                  : "border-[var(--control-border)] bg-white hover:border-[var(--accent)]",
+              )}
+              key={item.value}
+            >
+              <input
+                checked={interactionMode === item.value}
+                className="mt-0.5 size-5 shrink-0"
+                name="whatsappInteractionMode"
+                onChange={() => setInteractionMode(item.value)}
+                type="radio"
+                value={item.value}
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold">{item.label}</span>
+                <span className="mt-1 block text-xs leading-5 text-zinc-500">{item.hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="mt-4 text-xs leading-5 text-zinc-500">O canal nasce desligado. Ative e conecte o número depois, em Configurações › WhatsApp, onde o modo também pode ser alterado.</p>
       </section>
 
       <section className="surface p-6 sm:p-8" aria-labelledby="theme-title">

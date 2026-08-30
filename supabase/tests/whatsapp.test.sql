@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(179);
+select plan(182);
 
 select ok(
   not exists (
@@ -423,7 +423,7 @@ select is(
       and routing_mode = 'shared'
       and status = 'active'
   ),
-  3,
+  4,
   'Número central compartilhado possui vários tenants'
 );
 
@@ -3550,6 +3550,55 @@ select is(
   ),
   false,
   'Sessão expirada não envia resposta tardia'
+);
+
+-- Modo de interação escolhido no onboarding (0027).
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","app_metadata":{}}',
+  true
+);
+select public.complete_tenant_onboarding(
+  'Estúdio pgTAP Texto', 'pgtap-modo-texto', 'salon', 'Unidade', 'Rua Um, 1',
+  null, 'São Paulo', 'SP', null, '09:00', '18:00', 'Bia', '#171717', '#2563EB',
+  'text'
+);
+select public.complete_tenant_onboarding(
+  'Estúdio pgTAP Botões', 'pgtap-modo-botoes', 'salon', 'Unidade', 'Rua Um, 1',
+  null, 'São Paulo', 'SP', null, '09:00', '18:00', 'Bia', '#171717', '#2563EB'
+);
+select throws_ok(
+  $$
+    select public.complete_tenant_onboarding(
+      'Estúdio pgTAP Inválido', 'pgtap-modo-invalido', 'salon', 'Unidade', 'Rua Um, 1',
+      null, 'São Paulo', 'SP', null, '09:00', '18:00', 'Bia', '#171717', '#2563EB',
+      'voice'
+    )
+  $$,
+  '22023',
+  'invalid_onboarding_data',
+  'Onboarding recusa modo de interação desconhecido'
+);
+reset role;
+
+select ok(
+  (
+    select s.metadata->>'interaction_mode' = 'text' and not s.enabled and not s.booking_enabled
+    from public.tenant_whatsapp_settings s
+    join public.tenants t on t.id = s.tenant_id
+    where t.slug = 'pgtap-modo-texto'
+  ),
+  'Onboarding grava o modo texto sem ligar o canal'
+);
+select ok(
+  (
+    select s.metadata->>'interaction_mode' = 'buttons'
+    from public.tenant_whatsapp_settings s
+    join public.tenants t on t.id = s.tenant_id
+    where t.slug = 'pgtap-modo-botoes'
+  ),
+  'Onboarding sem modo informado grava botões'
 );
 
 select * from finish();

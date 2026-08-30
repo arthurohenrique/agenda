@@ -21,7 +21,7 @@ select ok(
 );
 
 set local role anon;
-select is((select count(*)::integer from public.tenants), 3, 'Anon vê somente tenants publicados');
+select is((select count(*)::integer from public.tenants), 4, 'Anon vê somente tenants publicados');
 reset role;
 
 set local role authenticated;

@@ -225,6 +225,57 @@ test.describe("simulador WhatsApp com banco local", () => {
     await expect(page.getByText(customerName, { exact: true })).toHaveCount(1);
   });
 
+  test("modo texto entende a frase, valida a profissional e agenda sem botão", async ({ page }, testInfo) => {
+    // Estúdio Texto nasce no seed em modo texto, para que nenhum outro cenário
+    // precise ter o modo alternado enquanto os três projetos correm em paralelo.
+    const customerName = `Cliente Texto ${testInfo.project.name}`;
+    const onlyText = (result: SimulatorResult) => {
+      const kinds = (result.responses ?? []).map((response) =>
+        response && typeof response === "object" && "kind" in response ? response.kind : null,
+      );
+      expect(kinds.length).toBeGreaterThan(0);
+      expect(kinds).toEqual(kinds.map(() => "text"));
+    };
+    await openSimulator(page, simulatedPhone(testInfo, "8"));
+
+    const start = await sendSimulatorMessage(page, {
+      message: "Olá",
+      routingCode: "TEXT01",
+      expectedState: "SERVICE_SELECTION",
+    });
+    onlyText(start);
+    expect(JSON.stringify(start.responses)).toContain("1 — Manicure");
+
+    // Serviço e profissional na mesma frase: pula a preferência e vai à data.
+    const dates = await sendSimulatorMessage(page, {
+      message: "quero fazer manicure com a Bia",
+      expectedState: "DATE_SELECTION",
+    });
+    onlyText(dates);
+    expect(JSON.stringify(dates.responses)).toContain("Anotei: Manicure · com Bia.");
+
+    const slots = await chooseAvailableDate(page, testInfo);
+    onlyText(slots);
+    expect(JSON.stringify(slots.responses)).toContain("· Bia");
+    expect(JSON.stringify(slots.responses)).not.toContain("· Carla");
+
+    await sendSimulatorMessage(page, { message: "1", expectedState: "CUSTOMER_IDENTIFICATION" });
+    const review = await sendSimulatorMessage(page, {
+      message: customerName,
+      expectedState: "BOOKING_CONFIRMATION",
+    });
+    onlyText(review);
+    expect(JSON.stringify(review.responses)).toContain("Profissional: Bia");
+
+    // Rótulo por extenso vale como a opção numerada.
+    const completed = await sendSimulatorMessage(page, {
+      message: "confirmar",
+      expectedState: "BOOKING_COMPLETED",
+    });
+    expect(completed.tenant?.name).toBe("Estúdio Texto");
+    expect(completed.appointment?.id).toBeTruthy();
+  });
+
   test("histórico, opção 9 e busca acrescentam um terceiro tenant", async ({ page }, testInfo) => {
     await openSimulator(page, simulatedPhone(testInfo, "2"));
 

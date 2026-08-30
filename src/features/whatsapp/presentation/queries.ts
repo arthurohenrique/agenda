@@ -2,7 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 import { getWhatsAppConfig } from "@/features/whatsapp/config";
-import { parseTenantWhatsAppMetadata } from "@/features/whatsapp/presentation/settings-contract";
+import {
+  parseTenantWhatsAppMetadata,
+  type WhatsAppInteractionMode,
+} from "@/features/whatsapp/presentation/settings-contract";
 import { getWhatsAppReadiness } from "@/features/whatsapp/readiness";
 import { getPublicEnv, isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -216,6 +219,7 @@ export interface TenantWhatsAppPresentation {
     quietHoursEnd: string;
     administrativeNotice: string | null;
     emergencyNotice: string | null;
+    interactionMode: WhatsAppInteractionMode;
   };
   availableServices: Array<{ id: string; name: string }>;
   availableLocations: Array<{ id: string; name: string }>;
@@ -556,6 +560,7 @@ function emptyTenantPresentation(message: string): TenantWhatsAppPresentation {
       quietHoursEnd: "08:00",
       administrativeNotice: null,
       emergencyNotice: null,
+      interactionMode: "buttons",
     },
     availableServices: [],
     availableLocations: [],
@@ -740,6 +745,7 @@ export async function getTenantWhatsAppPresentation(
       quietHoursEnd: preferences.quietHoursEnd,
       administrativeNotice: preferences.administrativeNotice,
       emergencyNotice: preferences.emergencyNotice,
+      interactionMode: preferences.interactionMode,
     } : emptyTenantPresentation("").settings,
     availableServices,
     availableLocations,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCommand, normalizeWords } from "@/lib/text/normalize";
 
 export const conversationStates = [
   "START",
@@ -70,6 +71,10 @@ const bookingDraftSchema = z.object({
   customerName: z.string().max(120).optional(),
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
   notes: z.string().max(800).optional(),
+  // Modo texto: hora ou período pedidos numa frase antes de a data ou o serviço
+  // estarem definidos. Aplicados quando os horários do dia são consultados.
+  requestedTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
+  requestedPeriod: z.enum(["morning", "afternoon", "evening"]).optional(),
 });
 
 export const conversationContextSchema = z.object({
@@ -140,6 +145,27 @@ export function optionForInput(
 ): ConversationOption | null {
   const normalized = input.trim();
   return options.find((option) => option.key === normalized) ?? null;
+}
+
+// Modo texto: além da chave ("2"), aceita o rótulo da opção escrito por
+// extenso ("quero escolher", "sim, cancelar") e "mais" para a paginação. A
+// comparação é da mensagem inteira, como nos comandos globais: casar por
+// substring faria "corte" escolher "Corte e barba".
+export function optionForTextInput(
+  options: readonly ConversationOption[],
+  input: string,
+): ConversationOption | null {
+  const exact = optionForInput(options, input);
+  if (exact) return exact;
+  const command = normalizeCommand(input);
+  if (!command) return null;
+  if (["mais", "ver mais", "more"].includes(command)) {
+    return options.find((option) => option.kind === "page") ?? null;
+  }
+  const words = normalizeWords(input);
+  return options.find(
+    (option) => option.kind !== "page" && normalizeWords(option.label) === words,
+  ) ?? null;
 }
 
 export function nextAttempt(context: ConversationContext, state: ConversationState) {

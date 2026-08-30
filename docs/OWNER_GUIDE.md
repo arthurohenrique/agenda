@@ -106,7 +106,25 @@ cada dispositivo.
 Os relatórios mostram os últimos 30 dias: agendamentos, receitas, clientes únicos,
 serviços mais agendados, cancelamentos e faltas.
 
-## 12. Boas práticas
+## 12. WhatsApp: botões ou texto
+
+O canal WhatsApp atende de duas formas. A escolha é feita ao criar o
+estabelecimento e pode ser mudada depois em **Configurações › WhatsApp**.
+
+- **Botões e listas**: o cliente toca nas opções. Se digitar algo numa pergunta de
+  escolha, o bot repete as opções.
+- **Somente texto**: não há botões. O cliente escreve como quiser e o bot entende
+  serviço, profissional, dia, horário e período ("de tarde"). O que faltar é
+  perguntado em texto, com opções numeradas — o cliente responde com o número ou
+  com o nome.
+
+Exemplos que o modo texto entende: "quero agendar corte sexta às 14h com a Maria",
+"manicure amanhã de tarde", "dia 15 às 10", "tanto faz o profissional". Se o
+horário pedido não existir, o bot oferece os mais próximos do dia. Se houver dois
+profissionais com o mesmo nome, ele pergunta qual. Em qualquer modo, "Menu",
+"Cancelar" e "Atendente" continuam funcionando.
+
+## 13. Boas práticas
 
 - Revise diariamente confirmações pendentes.
 - Use bloqueios em vez de deixar horários incorretos disponíveis.
@@ -115,7 +133,7 @@ serviços mais agendados, cancelamentos e faltas.
 - Use os dados de clientes apenas para administrar atendimentos.
 - Confirme o estabelecimento selecionado antes de alterar dados.
 
-## 13. Ajuda rápida
+## 14. Ajuda rápida
 
 | Situação | Ação recomendada |
 |---|---|
@@ -125,6 +143,7 @@ serviços mais agendados, cancelamentos e faltas.
 | Profissional não aparece | Confirme status público e associação ao serviço |
 | Página pública não abre | Revise o checklist de publicação |
 | Horário ficou indisponível | Outro agendamento ou bloqueio ocupou o intervalo |
+| Bot do WhatsApp não entende as frases | Confirme o modo "Somente texto" em Configurações › WhatsApp; no modo Botões o texto digitado só repete as opções |
 
 Em caso de dúvida, envie ao suporte o nome do estabelecimento, a tela acessada e o
 horário aproximado do problema. Nunca envie senha ou chave de API.

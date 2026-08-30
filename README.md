@@ -20,9 +20,12 @@ reservas públicas. Construído com Next.js, TypeScript e Supabase.
 - Paletas 60-30-10 pré-definidas por estabelecimento, refletidas no painel e na reserva pública.
 - Tema claro/escuro por dispositivo, preservando a identidade de cada estabelecimento.
 - RLS forçada, rate limit persistente e prevenção de sobreposição com GiST.
-- Canal WhatsApp oficial preparado com inbox, outbox, roteamento multi-tenant,
-  conversa persistida, links/QR por tenant, retenção, provedor mock e simulador
-  interno; conexão Meta ainda pendente.
+- Canal WhatsApp oficial com inbox, outbox, roteamento multi-tenant, conversa
+  persistida, links/QR por tenant, retenção, provedor mock e simulador interno.
+- Dois modos de atendimento por estabelecimento, escolhidos no onboarding e
+  editáveis em Configurações › WhatsApp: **botões** (o cliente toca nas opções) ou
+  **texto** (sem botões; o bot entende frases como "quero agendar corte sexta às 14h
+  com a Maria" por regras determinísticas, sem LLM, e pergunta só o que faltar).
 
 ## WhatsApp Business Platform
 

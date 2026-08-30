@@ -17,6 +17,7 @@ export const onboardingSchema = z.object({
   staffName: z.string().trim().min(2).max(120),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  whatsappInteractionMode: z.enum(["buttons", "text"]).default("buttons"),
 }).refine((data) => data.closesAt > data.opensAt, {
   path: ["closesAt"],
   message: "O fechamento deve ser depois da abertura.",

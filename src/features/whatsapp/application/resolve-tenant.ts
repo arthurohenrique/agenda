@@ -1,5 +1,7 @@
 import "server-only";
 
+import { normalizeText, stripDiacritics } from "@/lib/text/normalize";
+
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { PersistedConversation } from "../domain/conversation";
@@ -74,19 +76,14 @@ function mapTenant(input: unknown): TenantCandidate {
 }
 
 export function normalizeRoutingCode(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+  return stripDiacritics(value)
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 32);
 }
 
 export function extractRoutingCode(message: string): string | null {
-  const normalized = message
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
+  const normalized = stripDiacritics(message).toUpperCase();
   const marked = /(?:CODIGO|COD|CODE)\s*[:#-]?\s*#?([A-Z0-9][A-Z0-9-]{4,31})(?=$|\s|[.,;!?])/.exec(
     normalized,
   );
@@ -248,13 +245,7 @@ export async function searchWhatsAppTenants(input: {
   query: string;
   phoneNumberId: string;
 }): Promise<TenantCandidate[]> {
-  const needle = input.query
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 80);
+  const needle = normalizeText(input.query).slice(0, 80);
   if (needle.length < 2) return [];
   const activeTenantIds = await activeTenantIdsForPhone(input.phoneNumberId);
   if (activeTenantIds.length === 0) return [];
@@ -277,12 +268,9 @@ export async function searchWhatsAppTenants(input: {
     .parse(data ?? [])
     .map(mapTenant)
     .filter((tenant) =>
-      [tenant.name, tenant.slug, tenant.city ?? "", tenant.district ?? ""]
-        .join(" ")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLocaleLowerCase("pt-BR")
-        .includes(needle),
+      normalizeText(
+        [tenant.name, tenant.slug, tenant.city ?? "", tenant.district ?? ""].join(" "),
+      ).includes(needle),
     );
 }
 

@@ -31,6 +31,7 @@ export async function completeOnboardingAction(
     staffName: formData.get("staffName"),
     primaryColor: formData.get("primaryColor"),
     accentColor: formData.get("accentColor"),
+    whatsappInteractionMode: formData.get("whatsappInteractionMode") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -57,6 +58,7 @@ export async function completeOnboardingAction(
     p_staff_name: parsed.data.staffName,
     p_primary_color: parsed.data.primaryColor,
     p_accent_color: parsed.data.accentColor,
+    p_whatsapp_interaction_mode: parsed.data.whatsappInteractionMode,
   });
 
   if (error) {
