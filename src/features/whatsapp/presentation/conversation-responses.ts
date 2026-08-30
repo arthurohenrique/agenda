@@ -143,9 +143,14 @@ export function presentOptions(input: {
   maxReplyButtons: number;
   listButtonText?: string;
   hint?: string | null;
+  // O corpo já traz as alternativas em prosa (copy do modo texto): nada de
+  // lista numerada nem dica.
+  prose?: boolean;
 }): ConversationResponse {
   if (input.mode === "text") {
-    return numberedOptionsResponse(input.body, input.options, input.hint);
+    return input.prose
+      ? textResponse(input.body)
+      : numberedOptionsResponse(input.body, input.options, input.hint);
   }
   if (input.listButtonText) {
     return listResponse(input.body, input.listButtonText, input.options);
@@ -200,13 +205,14 @@ export function bookingStartResponses(input: {
   options: readonly ConversationOption[];
   mode?: WhatsAppInteractionMode;
   hint?: string | null;
+  prose?: boolean;
 }): ConversationResponse[] {
   const mode = input.mode ?? "buttons";
   // No modo texto as opções fazem parte do corpo, e o limite é o de texto puro.
   const limit = mode === "text"
     ? WHATSAPP_TEXT_BODY_MAX_LENGTH
     : WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH;
-  const prompt = mode === "text"
+  const prompt = mode === "text" && !input.prose
     ? numberedBody(input.prompt, input.options, input.hint ?? TEXT_MODE_DEFAULT_HINT)
     : input.prompt;
   if (prompt.length > limit) {

@@ -183,6 +183,14 @@ política entre canais.
   interpreta a frase do cliente com regras determinísticas (serviço, profissional,
   data, hora, período, intenção — `domain/intent/`) e pergunta em texto o que falta
   (`application/text-mode.ts`). Sem LLM.
+* [x] O modo texto conversa em prosa, não em lista numerada — copy centralizada em
+  `presentation/text-mode-copy.ts` (tom informal, sem emoji; alternativas inline até
+  6 itens, linhas até 12, numeradas acima). Entende gírias e abreviações
+  (`domain/intent/slang.ts`), nome de profissional fora do cadastro
+  (`staff-name.ts` → avisa e oferece quem atende), sim/não/trocar/cancelar em
+  pergunta fechada (`affirmation.ts`, só em `AFFIRMATION_STATES`) e atalhos de
+  horário ("o primeiro", "o último", hora digitada). Uma pergunta só para
+  profissional ("Tem X e Y — ou tanto faz?"). Números continuam aceitos em silêncio.
 
 ## Roteamento
 

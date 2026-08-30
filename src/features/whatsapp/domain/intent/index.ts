@@ -2,6 +2,8 @@ import { normalizeText } from "@/lib/text/normalize";
 import { matchCatalog, type CatalogItem } from "./catalog";
 import { parseDate } from "./date";
 import { mentionsAnyStaff, parseIntentKeyword, type BookingIntent } from "./intent";
+import { expandSlang } from "./slang";
+import { extractRequestedStaffName } from "./staff-name";
 import { parsePeriod, parseTime, type DayPeriod } from "./time";
 import { withoutMatch, withoutWords } from "./tokens";
 
@@ -12,6 +14,15 @@ export { matchCatalog } from "./catalog";
 export { parseDate } from "./date";
 export { mentionsAnyStaff, parseIntentKeyword } from "./intent";
 export { parsePeriod, parseTime, periodHours } from "./time";
+export { expandSlang } from "./slang";
+export { extractRequestedStaffName } from "./staff-name";
+export {
+  mentionsOtherDate,
+  parseAffirmation,
+  parseSlotShortcut,
+  type Affirmation,
+  type SlotShortcut,
+} from "./affirmation";
 
 export interface ParseIntentInput<Service extends CatalogItem, Staff extends CatalogItem> {
   // yyyy-MM-dd no fuso do estabelecimento.
@@ -29,6 +40,9 @@ export interface ParsedIntent<Service extends CatalogItem, Staff extends Catalog
   staffCandidates: Staff[];
   // "Sem preferência", "qualquer um".
   staffAny: boolean;
+  // Nome pedido que não casou com ninguém do cadastro ("com Raul"). Só quando
+  // não houve match nem ambiguidade — a conversa avisa e oferece quem atende.
+  requestedStaffName: string | null;
   date: string | null;
   time: string | null;
   period: DayPeriod | null;
@@ -46,7 +60,7 @@ export function parseIntent<Service extends CatalogItem, Staff extends CatalogIt
   text: string,
   input: ParseIntentInput<Service, Staff>,
 ): ParsedIntent<Service, Staff> {
-  let remainder = normalizeText(text);
+  let remainder = expandSlang(normalizeText(text));
 
   const time = parseTime(remainder);
   remainder = withoutMatch(remainder, time?.matched);
@@ -58,12 +72,15 @@ export function parseIntent<Service extends CatalogItem, Staff extends CatalogIt
   if (serviceMatch.kind === "match") remainder = withoutWords(remainder, serviceMatch.matched);
   const staffAny = mentionsAnyStaff(remainder);
   const staffMatch = staffAny ? { kind: "none" as const } : matchCatalog(remainder, input.staff);
+  const requestedStaffName = !staffAny && staffMatch.kind === "none"
+    ? extractRequestedStaffName(remainder)
+    : null;
 
   const service = serviceMatch.kind === "match" ? serviceMatch.item : null;
   const staff = staffMatch.kind === "match" ? staffMatch.item : null;
   const serviceCandidates = serviceMatch.kind === "ambiguous" ? serviceMatch.items : [];
   const staffCandidates = staffMatch.kind === "ambiguous" ? staffMatch.items : [];
-  const intent = parseIntentKeyword(text);
+  const intent = parseIntentKeyword(expandSlang(normalizeText(text)));
 
   return {
     intent,
@@ -72,11 +89,12 @@ export function parseIntent<Service extends CatalogItem, Staff extends CatalogIt
     staff,
     staffCandidates,
     staffAny,
+    requestedStaffName,
     date: date?.date ?? null,
     time: time?.time ?? null,
     period,
     matched: Boolean(
-      intent || service || staff || staffAny || date || time || period
+      intent || service || staff || staffAny || requestedStaffName || date || time || period
         || serviceCandidates.length || staffCandidates.length,
     ),
   };

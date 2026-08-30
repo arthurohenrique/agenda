@@ -396,9 +396,9 @@ def build():
         bullets(
             [
                 "Botões e listas: o cliente toca nas opções. Texto digitado numa pergunta de escolha repete as opções.",
-                "Somente texto: sem botões. O bot entende serviço, profissional, dia, horário e período na frase do cliente e pergunta em texto o que faltar.",
-                "Exemplos entendidos: “quero agendar corte sexta às 14h com a Maria”, “manicure amanhã de tarde”, “dia 15 às 10”.",
-                "Horário inexistente: o bot oferece os mais próximos do dia. Nome ambíguo: ele pergunta qual profissional.",
+                "Somente texto: sem botões. O bot conversa como uma pessoa: entende serviço, profissional, dia, horário e período na frase, repete o que entendeu e pergunta só o que faltar.",
+                "Exemplos entendidos: “corte e barba com Raul hj”, “manicure amn de tarde”, “dia 15 às 10”, “sim, pode confirmar”, “o primeiro”.",
+                "Horário inexistente: o bot oferece os mais próximos do dia. Profissional que não existe: ele avisa e lista quem atende. Nome ambíguo: pergunta qual.",
                 "Em qualquer modo, Menu, Cancelar e Atendente continuam valendo.",
             ]
         )
