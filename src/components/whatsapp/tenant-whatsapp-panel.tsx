@@ -24,6 +24,19 @@ import { WhatsAppFormSubmit } from "@/components/whatsapp/whatsapp-form-submit";
 import { WhatsAppHandoffQueue } from "@/components/whatsapp/whatsapp-handoff-queue";
 import type { TenantWhatsAppPresentation } from "@/features/whatsapp/presentation/queries";
 
+export const interactionModes = [
+  {
+    value: "buttons",
+    label: "Botões e listas",
+    hint: "O cliente toca nas opções. Texto digitado em uma pergunta de escolha só repete as opções.",
+  },
+  {
+    value: "text",
+    label: "Somente texto",
+    hint: "Sem botões. O bot entende frases como “quero agendar corte sexta às 14h com a Maria” e pergunta em texto o que faltar.",
+  },
+] as const;
+
 function count(value: number | null) {
   return value === null ? "—" : new Intl.NumberFormat("pt-BR").format(value);
 }
@@ -122,6 +135,22 @@ export function TenantWhatsAppPanel({
                   <Icon aria-hidden="true" className="shrink-0 text-zinc-500" size={18} />
                   <span className="min-w-0 flex-1 text-sm font-semibold">{label}</span>
                   <input className="size-5" defaultChecked={enabled} name={name} type="checkbox" />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset className="mt-6">
+            <legend className="text-sm font-bold">Modo de interação</legend>
+            <p className="mt-1 text-sm leading-6 text-zinc-500">Define como o cliente responde ao bot. Vale para todas as conversas novas do estabelecimento.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {interactionModes.map(({ value, label, hint }) => (
+                <label className="flex min-h-12 items-start gap-3 rounded-xl bg-zinc-50 px-4 py-3" key={value}>
+                  <input className="mt-0.5 size-5 shrink-0" defaultChecked={presentation.settings.interactionMode === value} name="interactionMode" type="radio" value={value} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-zinc-500">{hint}</span>
+                  </span>
                 </label>
               ))}
             </div>

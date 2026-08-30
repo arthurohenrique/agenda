@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { conversationContextSchema } from "@/features/whatsapp/domain/conversation";
 import type { PersistedConversation } from "@/features/whatsapp/domain/conversation";
 import type { WhatsAppBookingGateway } from "@/features/whatsapp/application/booking-gateway";
@@ -67,9 +67,11 @@ function gateway(): WhatsAppBookingGateway {
       unknownMessageResponse: null,
       administrativeNotice: null,
       emergencyNotice: null,
+      interactionMode: "buttons" as const,
     })),
     listServices: vi.fn(async () => []),
     listStaff: vi.fn(async () => []),
+    listAllStaff: vi.fn(async () => []),
     getAvailableSlots: vi.fn(async () => []),
     createBooking: vi.fn(),
     listUpcomingBookings: vi.fn(async () => []),
@@ -395,6 +397,7 @@ describe("WhatsApp conversation state machine", () => {
       unknownMessageResponse: null,
       administrativeNotice: null,
       emergencyNotice: null,
+      interactionMode: "buttons" as const,
     });
     mocks.getWhatsAppTenantById.mockResolvedValue(target);
     mocks.attachContactToTenant.mockResolvedValue({
@@ -729,6 +732,547 @@ describe("WhatsApp conversation state machine", () => {
       responses: [{ kind: "text", body: "Use as opções disponíveis." }],
     });
     expect(handoff.transition.context.handoff).toBeUndefined();
+  });
+
+  describe("modo texto", () => {
+    const service = {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      name: "Corte feminino",
+      durationMinutes: 60,
+      priceCents: 9_000,
+      allowStaffSelection: true,
+    };
+    const staff = [
+      { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", name: "Maria" },
+      { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000002", name: "Joana" },
+    ];
+
+    async function textGateway(): Promise<WhatsAppBookingGateway> {
+      const bookingGateway = gateway();
+      vi.mocked(bookingGateway.getTenantContext).mockResolvedValue({
+        ...await gateway().getTenantContext(ids.tenant),
+        interactionMode: "text",
+      });
+      vi.mocked(bookingGateway.listServices).mockResolvedValue([service]);
+      vi.mocked(bookingGateway.listStaff).mockResolvedValue(staff);
+      vi.mocked(bookingGateway.listAllStaff).mockResolvedValue(staff);
+      vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([
+        {
+          startAt: "2026-09-01T13:00:00.000Z",
+          endAt: "2026-09-01T14:00:00.000Z",
+          staffId: staff[0]!.id,
+          staffName: "Maria",
+        },
+        {
+          startAt: "2026-09-01T17:00:00.000Z",
+          endAt: "2026-09-01T18:00:00.000Z",
+          staffId: staff[0]!.id,
+          staffName: "Maria",
+        },
+      ]);
+      return bookingGateway;
+    }
+
+    function onlyText(responses: readonly { kind: string }[]) {
+      expect(responses.length).toBeGreaterThan(0);
+      expect(responses.map((response) => response.kind)).toEqual(
+        responses.map(() => "text"),
+      );
+    }
+
+    it("conduz o agendamento inteiro só com texto e opções numeradas", async () => {
+      const bookingGateway = await textGateway();
+      mocks.resolveWhatsAppTenant.mockResolvedValue({
+        kind: "resolved",
+        tenant: { ...tenant(1), id: ids.tenant },
+        source: "routing_code",
+      } satisfies TenantResolution);
+      mocks.attachContactToTenant.mockResolvedValue({
+        customerId: ids.customer,
+        customerTenantId: "99999999-9999-4999-8999-999999999999",
+      });
+
+      const start = await transitionConversation(
+        transitionInput({
+          text: "ABC123",
+          bookingGateway,
+          conversation: conversation({ tenantId: null, currentState: "START" }),
+        }),
+      );
+      expect(start.transition.state).toBe("SERVICE_SELECTION");
+      onlyText(start.transition.responses);
+      expect(start.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("1 — Corte feminino"),
+      });
+
+      // O rótulo escrito por extenso vale como a chave.
+      const preference = await transitionConversation(
+        transitionInput({
+          text: "corte feminino",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "SERVICE_SELECTION",
+            context: start.transition.context,
+          }),
+        }),
+      );
+      expect(preference.transition.state).toBe("STAFF_PREFERENCE");
+      onlyText(preference.transition.responses);
+      expect(preference.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("2 — Quero escolher"),
+      });
+
+      const staffList = await transitionConversation(
+        transitionInput({
+          text: "Quero escolher!",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "STAFF_PREFERENCE",
+            context: preference.transition.context,
+          }),
+        }),
+      );
+      expect(staffList.transition.state).toBe("STAFF_SELECTION");
+      onlyText(staffList.transition.responses);
+
+      const dates = await transitionConversation(
+        transitionInput({
+          text: "Maria",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "STAFF_SELECTION",
+            context: staffList.transition.context,
+          }),
+        }),
+      );
+      expect(dates.transition.state).toBe("DATE_SELECTION");
+      expect(dates.transition.context.booking.staffName).toBe("Maria");
+      onlyText(dates.transition.responses);
+
+      const slots = await transitionConversation(
+        transitionInput({
+          text: "1",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "DATE_SELECTION",
+            context: dates.transition.context,
+          }),
+        }),
+      );
+      expect(slots.transition.state).toBe("SLOT_SELECTION");
+      onlyText(slots.transition.responses);
+      expect(slots.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("9 — Escolher outra data"),
+      });
+
+      const name = await transitionConversation(
+        transitionInput({
+          text: "2",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "SLOT_SELECTION",
+            context: slots.transition.context,
+          }),
+        }),
+      );
+      expect(name.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+      expect(name.transition.context.booking.startsAt).toBe("2026-09-01T17:00:00.000Z");
+
+      const review = await transitionConversation(
+        transitionInput({
+          text: "Ana Silva",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "CUSTOMER_IDENTIFICATION",
+            context: name.transition.context,
+          }),
+        }),
+      );
+      expect(review.transition.state).toBe("BOOKING_CONFIRMATION");
+      onlyText(review.transition.responses);
+      expect(review.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("1 — Confirmar"),
+      });
+    });
+
+    it("reapresenta as opções em texto e encaminha na terceira entrada inválida", async () => {
+      const bookingGateway = await textGateway();
+      const context = conversationContextSchema.parse({
+        booking: { serviceId: service.id },
+        options: [
+          { key: "1", label: "Sem preferência", value: "any", kind: "action" },
+          { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
+        ],
+      });
+
+      // "tanto faz" é entendido pelo parser como "sem preferência"; a entrada
+      // inválida precisa não dizer nada.
+      const shrug = await transitionConversation(
+        transitionInput({
+          text: "tanto faz",
+          bookingGateway,
+          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+        }),
+      );
+      expect(shrug.transition.state).toBe("DATE_SELECTION");
+      expect(shrug.transition.context.booking.staffId).toBeNull();
+
+      const first = await transitionConversation(
+        transitionInput({
+          text: "hmmmm",
+          bookingGateway,
+          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+        }),
+      );
+      expect(first.transition.state).toBe("STAFF_PREFERENCE");
+      onlyText(first.transition.responses);
+      expect(first.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("Responda 1 para sem preferência ou 2 para escolher."),
+      });
+      expect(first.transition.responses[0]).toMatchObject({
+        body: expect.stringContaining("1 — Sem preferência"),
+      });
+
+      const third = await transitionConversation(
+        transitionInput({
+          text: "hmmmm",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "STAFF_PREFERENCE",
+            context: { ...context, attempts: { STAFF_PREFERENCE: 2 } },
+          }),
+        }),
+      );
+      expect(third.transition.state).toBe("HUMAN_HANDOFF");
+    });
+
+    describe("frase interpretada", () => {
+      // 2026-08-31 é segunda-feira em São Paulo; "sexta" é 2026-09-04.
+      const friday14 = {
+        startAt: "2026-09-04T17:00:00.000Z",
+        endAt: "2026-09-04T18:00:00.000Z",
+        staffId: staff[0]!.id,
+        staffName: "Maria",
+      };
+      const friday10 = {
+        startAt: "2026-09-04T13:00:00.000Z",
+        endAt: "2026-09-04T14:00:00.000Z",
+        staffId: staff[0]!.id,
+        staffName: "Maria",
+      };
+      const friday16 = {
+        startAt: "2026-09-04T19:00:00.000Z",
+        endAt: "2026-09-04T20:00:00.000Z",
+        staffId: staff[0]!.id,
+        staffName: "Maria",
+      };
+
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-08-31T15:00:00.000Z"));
+        mocks.attachContactToTenant.mockResolvedValue({
+          customerId: ids.customer,
+          customerTenantId: "99999999-9999-4999-8999-999999999999",
+        });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("preenche serviço, profissional, data e hora de uma vez e pede só o nome", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday10, friday14, friday16]);
+        const menu = conversationContextSchema.parse({
+          options: [{ key: "1", label: "Novo agendamento", value: "new_booking", kind: "action" }],
+        });
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "Quero agendar corte feminino para sexta às 14h com a Maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "MAIN_MENU", context: menu }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+        expect(result.transition.context.booking).toMatchObject({
+          serviceId: service.id,
+          serviceName: "Corte feminino",
+          staffId: staff[0]!.id,
+          staffName: "Maria",
+          date: "2026-09-04",
+          requestedTime: "14:00",
+          startsAt: friday14.startAt,
+          endsAt: friday14.endAt,
+          locationId: ids.location,
+        });
+        expect(bookingGateway.listStaff).toHaveBeenCalledWith(ids.tenant, service.id);
+        expect(bookingGateway.getAvailableSlots).toHaveBeenCalledWith(expect.objectContaining({
+          serviceId: service.id,
+          staffId: staff[0]!.id,
+          rangeStart: "2026-09-04T03:00:00.000Z",
+          rangeEnd: "2026-09-05T03:00:00.000Z",
+        }));
+        expect(mocks.attachContactToTenant).toHaveBeenCalledTimes(1);
+        onlyText(result.transition.responses);
+        expect(result.transition.responses[0]).toMatchObject({
+          body: expect.stringContaining("Anotei: Corte feminino"),
+        });
+        expect(result.transition.responses.at(-1)).toMatchObject({
+          body: "Para concluir, informe seu nome completo.",
+        });
+      });
+
+      it("vai direto ao resumo quando o nome já é conhecido", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday14]);
+        const context = conversationContextSchema.parse({
+          customerId: ids.customer,
+          customerTenantId: "99999999-9999-4999-8999-999999999999",
+          booking: { customerName: "Ana Silva" },
+          options: [],
+        });
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino sexta 14h com maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "BOOKING_CONFLICT", context }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("BOOKING_CONFIRMATION");
+        expect(result.transition.responses.at(-1)).toMatchObject({
+          body: expect.stringContaining("Nome: Ana Silva"),
+        });
+        expect(mocks.attachContactToTenant).not.toHaveBeenCalled();
+      });
+
+      it("oferece os horários mais próximos quando a hora pedida não existe", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday10, friday16]);
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino sexta às 14h com a Maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("SLOT_SELECTION");
+        expect(result.transition.context.options.filter((option) => option.kind === "slot"))
+          .toHaveLength(2);
+        expect(result.transition.responses.at(-1)).toMatchObject({
+          body: expect.stringContaining("Não tenho 14:00"),
+        });
+      });
+
+      it("filtra os horários pelo período do dia", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday10, friday14, friday16]);
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino sexta de tarde, tanto faz o profissional",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("SLOT_SELECTION");
+        expect(bookingGateway.getAvailableSlots).toHaveBeenCalledWith(
+          expect.objectContaining({ staffId: null }),
+        );
+        expect(
+          result.transition.context.options
+            .filter((option) => option.kind === "slot")
+            .map((option) => option.label),
+        ).toEqual(["14:00 · Maria", "16:00 · Maria"]);
+      });
+
+      it("guarda data e hora ditas antes do serviço e as aproveita depois", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday14]);
+        vi.mocked(bookingGateway.listServices).mockResolvedValue([{ ...service, allowStaffSelection: false }]);
+
+        const asked = await transitionConversation(
+          transitionInput({
+            text: "sexta às 14h",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(asked.transition.state).toBe("SERVICE_SELECTION");
+        expect(asked.transition.context.booking).toMatchObject({ date: "2026-09-04", requestedTime: "14:00" });
+        expect(asked.transition.responses[0]).toMatchObject({
+          body: expect.stringContaining("Anotei: sexta-feira, 4 de setembro · 14:00."),
+        });
+
+        const chosen = await transitionConversation(
+          transitionInput({
+            text: "1",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "SERVICE_SELECTION",
+              context: asked.transition.context,
+            }),
+          }),
+        );
+        expect(chosen.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+        expect(chosen.transition.context.booking.startsAt).toBe(friday14.startAt);
+      });
+
+      it("pergunta qual profissional quando o nome é ambíguo", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.listAllStaff).mockResolvedValue([
+          ...staff,
+          { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000003", name: "Maria" },
+        ]);
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino com a maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("STAFF_SELECTION");
+        expect(result.transition.context.options.map((option) => option.value)).toEqual([
+          staff[0]!.id,
+          "bbbbbbbb-bbbb-4bbb-8bbb-000000000003",
+        ]);
+        expect(result.transition.context.booking.staffId).toBeUndefined();
+        expect(result.transition.responses.map((response) => response.kind === "text" ? response.body : "")).toEqual([
+          "Anotei: Corte feminino.",
+          "Há mais de um profissional com esse nome. Qual deles?",
+          expect.stringContaining("1 — Maria"),
+        ]);
+      });
+
+      it("avisa quando a profissional não atende o serviço", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.listStaff).mockResolvedValue([staff[1]!]);
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino com a Maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("STAFF_SELECTION");
+        expect(result.transition.context.options.map((option) => option.value)).toEqual([staff[1]!.id]);
+        expect(result.transition.responses.some((response) =>
+          response.kind === "text" && response.body.includes("Maria não atende Corte feminino")
+        )).toBe(true);
+      });
+
+      it("encaminha pedidos de atendente e de agendamentos existentes", async () => {
+        const bookingGateway = await textGateway();
+        const human = await transitionConversation(
+          transitionInput({
+            text: "quero falar com um atendente por favor",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(human.transition.state).toBe("HUMAN_HANDOFF");
+
+        const upcoming = await transitionConversation(
+          transitionInput({
+            text: "preciso cancelar meu horário de sexta",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "MAIN_MENU",
+              context: conversationContextSchema.parse({ customerId: ids.customer }),
+            }),
+          }),
+        );
+        expect(bookingGateway.listUpcomingBookings).toHaveBeenCalled();
+        expect(upcoming.transition.state).toBe("MAIN_MENU");
+      });
+
+      it("trata frase sem sinal como entrada inválida e nunca interpreta o nome", async () => {
+        const bookingGateway = await textGateway();
+        const nothing = await transitionConversation(
+          transitionInput({
+            text: "bom dia, tudo bem?",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(nothing.transition.state).toBe("SERVICE_SELECTION");
+        expect(nothing.transition.context.attempts.SERVICE_SELECTION).toBe(1);
+
+        const named = await transitionConversation(
+          transitionInput({
+            text: "ajuda maria",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "CUSTOMER_IDENTIFICATION",
+              context: conversationContextSchema.parse({
+                booking: { serviceName: "Corte feminino", startsAt: friday14.startAt },
+              }),
+            }),
+          }),
+        );
+        expect(named.transition.state).toBe("BOOKING_CONFIRMATION");
+        expect(named.transition.context.booking.customerName).toBe("ajuda maria");
+      });
+
+      it("no modo botões a mesma frase é entrada inválida e o parser não roda", async () => {
+        const bookingGateway = gateway();
+        vi.mocked(bookingGateway.listServices).mockResolvedValue([service]);
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "Quero agendar corte feminino para sexta às 14h com a Maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("SERVICE_SELECTION");
+        expect(result.transition.context.attempts.SERVICE_SELECTION).toBe(1);
+        expect(bookingGateway.listAllStaff).not.toHaveBeenCalled();
+      });
+    });
+
+    it("no modo botões o mesmo caminho segue interativo e ignora o rótulo digitado", async () => {
+      const bookingGateway = gateway();
+      vi.mocked(bookingGateway.listServices).mockResolvedValue([service]);
+      const context = conversationContextSchema.parse({
+        booking: { serviceId: service.id },
+        options: [
+          { key: "1", label: "Sem preferência", value: "any", kind: "action" },
+          { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
+        ],
+      });
+
+      const typed = await transitionConversation(
+        transitionInput({
+          text: "sem preferência",
+          bookingGateway,
+          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+        }),
+      );
+      expect(typed.transition.state).toBe("STAFF_PREFERENCE");
+      expect(typed.transition.responses[0]?.kind).toBe("reply_buttons");
+
+      const tapped = await transitionConversation(
+        transitionInput({
+          text: "1",
+          bookingGateway,
+          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+        }),
+      );
+      expect(tapped.transition.state).toBe("DATE_SELECTION");
+      expect(tapped.transition.responses[0]?.kind).toBe("list");
+    });
   });
 
   it("preserves maximum notices while keeping the service list body valid", async () => {

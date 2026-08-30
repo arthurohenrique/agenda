@@ -391,7 +391,23 @@ def build():
     )
     story.append(PageBreak())
 
-    story.extend(title("9. Solução de problemas", "Verificações rápidas antes de acionar o suporte."))
+    story.extend(title("9. WhatsApp: botões ou texto", "Escolhido ao criar o estabelecimento; editável em Configurações › WhatsApp."))
+    story.extend(
+        bullets(
+            [
+                "Botões e listas: o cliente toca nas opções. Texto digitado numa pergunta de escolha repete as opções.",
+                "Somente texto: sem botões. O bot entende serviço, profissional, dia, horário e período na frase do cliente e pergunta em texto o que faltar.",
+                "Exemplos entendidos: “quero agendar corte sexta às 14h com a Maria”, “manicure amanhã de tarde”, “dia 15 às 10”.",
+                "Horário inexistente: o bot oferece os mais próximos do dia. Nome ambíguo: ele pergunta qual profissional.",
+                "Em qualquer modo, Menu, Cancelar e Atendente continuam valendo.",
+            ]
+        )
+    )
+    story.append(Spacer(1, 5 * mm))
+    story.append(note("A interpretação é por regras fixas, sem inteligência artificial externa: a mensagem do cliente não sai da plataforma.", "success"))
+    story.append(PageBreak())
+
+    story.extend(title("10. Solução de problemas", "Verificações rápidas antes de acionar o suporte."))
     help_rows = [
         ["Não consigo entrar", "Redefina a senha e confirme o e-mail."],
         ["Não há horários", "Revise expediente, equipe, bloqueios e antecedência."],

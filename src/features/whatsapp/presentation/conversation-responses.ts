@@ -1,4 +1,5 @@
 import type { ConversationOption } from "../domain/conversation";
+import type { WhatsAppInteractionMode } from "../domain/interaction-mode";
 import type { ConversationResponse } from "../domain/provider";
 
 export const WHATSAPP_TEXT_BODY_MAX_LENGTH = 4096;
@@ -102,6 +103,56 @@ export function replyButtonsResponse(
   );
 }
 
+export const TEXT_MODE_DEFAULT_HINT = "Responda com o número da opção.";
+
+function optionLine(option: ConversationOption): string {
+  // A chave da paginação é "more", mas o cliente escreve "mais".
+  return option.kind === "page" ? `mais — ${option.label}` : `${option.key} — ${option.label}`;
+}
+
+function numberedBody(
+  body: string,
+  options: readonly ConversationOption[],
+  hint: string | null,
+): string {
+  return [
+    body,
+    ...(options.length ? ["", ...options.map(optionLine)] : []),
+    ...(hint ? ["", hint] : []),
+  ].join("\n");
+}
+
+// Pergunta com opções em texto puro: o único formato do modo `text`. A mesma
+// lista que viraria botões vira linhas numeradas, e a dica final diz como
+// responder — no modo texto não há nada para tocar.
+export function numberedOptionsResponse(
+  body: string,
+  options: readonly ConversationOption[],
+  hint: string | null = TEXT_MODE_DEFAULT_HINT,
+): TextResponse {
+  return textResponse(numberedBody(body, options, options.length ? hint : null));
+}
+
+// Ponto único de escolha entre interativo e texto. Quem chama descreve a
+// pergunta e o modo; o formato sai daqui. `listButtonText` reproduz a escolha
+// original de cada passo no modo `buttons`: com ele, lista; sem ele, botões.
+export function presentOptions(input: {
+  mode: WhatsAppInteractionMode;
+  body: string;
+  options: readonly ConversationOption[];
+  maxReplyButtons: number;
+  listButtonText?: string;
+  hint?: string | null;
+}): ConversationResponse {
+  if (input.mode === "text") {
+    return numberedOptionsResponse(input.body, input.options, input.hint);
+  }
+  if (input.listButtonText) {
+    return listResponse(input.body, input.listButtonText, input.options);
+  }
+  return replyButtonsResponse(input.body, input.options, input.maxReplyButtons);
+}
+
 export function listResponse(
   body: string,
   buttonText: string,
@@ -130,8 +181,10 @@ export function repromptResponse(
   message: string,
   options: readonly ConversationOption[],
   maxReplyButtons: number,
+  mode: WhatsAppInteractionMode = "buttons",
 ): ConversationResponse {
   if (options.length === 0) return textResponse(message);
+  if (mode === "text") return numberedOptionsResponse(message, options);
   if (options.length <= maxReplyButtons) {
     return replyButtonsResponse(message, options, maxReplyButtons);
   }
@@ -145,34 +198,41 @@ export function bookingStartResponses(input: {
   prompt: string;
   buttonText: string;
   options: readonly ConversationOption[];
+  mode?: WhatsAppInteractionMode;
+  hint?: string | null;
 }): ConversationResponse[] {
-  if (input.prompt.length > WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH) {
+  const mode = input.mode ?? "buttons";
+  // No modo texto as opções fazem parte do corpo, e o limite é o de texto puro.
+  const limit = mode === "text"
+    ? WHATSAPP_TEXT_BODY_MAX_LENGTH
+    : WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH;
+  const prompt = mode === "text"
+    ? numberedBody(input.prompt, input.options, input.hint ?? TEXT_MODE_DEFAULT_HINT)
+    : input.prompt;
+  if (prompt.length > limit) {
     throw new Error("whatsapp_interactive_prompt_too_long");
   }
+  const render = (body: string): ConversationResponse => mode === "text"
+    ? textResponse(body)
+    : listResponse(body, input.buttonText, input.options);
 
   const notices = [
     { body: input.emergencyNotice, weight: 3 },
     { body: input.administrativeNotice, weight: 2 },
     { body: input.welcomeMessage, weight: 1 },
   ].filter((notice): notice is { body: string; weight: number } => Boolean(notice.body));
-  const combinedBody = [...notices.map((notice) => notice.body), input.prompt].join("\n\n");
+  const combinedBody = [...notices.map((notice) => notice.body), prompt].join("\n\n");
 
-  if (combinedBody.length <= WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH) {
-    return [listResponse(combinedBody, input.buttonText, input.options)];
+  if (combinedBody.length <= limit) {
+    return [render(combinedBody)];
   }
 
   const separatorLength = notices.length * 2;
-  const noticeBudget = WHATSAPP_INTERACTIVE_BODY_MAX_LENGTH
-    - input.prompt.length
-    - separatorLength;
+  const noticeBudget = limit - prompt.length - separatorLength;
   if (noticeBudget <= 0) {
-    return [listResponse(input.prompt, input.buttonText, input.options)];
+    return [render(prompt)];
   }
   const compactNotices = weightedNoticeBodies(notices, noticeBudget);
 
-  return [listResponse(
-    [...compactNotices.filter(Boolean), input.prompt].join("\n\n"),
-    input.buttonText,
-    input.options,
-  )];
+  return [render([...compactNotices.filter(Boolean), prompt].join("\n\n"))];
 }

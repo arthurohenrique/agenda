@@ -43,7 +43,11 @@ insert into public.tenants (
 ) values
   ('20000000-0000-0000-0000-000000000001', 'barbearia-central', 'Barbearia Central', 'barbershop', 'published', 'America/Sao_Paulo', 'pt-BR', 'BRL', 'BARB01', 'sao paulo', 'centro', 'barbearia', '10000000-0000-0000-0000-000000000001', now()),
   ('20000000-0000-0000-0000-000000000002', 'salao-da-ana', 'Salão da Ana', 'salon', 'published', 'America/Sao_Paulo', 'pt-BR', 'BRL', 'SALA01', 'campinas', 'cambui', 'salao', '10000000-0000-0000-0000-000000000002', now()),
-  ('20000000-0000-0000-0000-000000000003', 'clinica-vida', 'Clínica Vida', 'clinic', 'published', 'America/Sao_Paulo', 'pt-BR', 'BRL', 'CLIN01', 'sao paulo', 'moema', 'clinica', '10000000-0000-0000-0000-000000000003', now())
+  ('20000000-0000-0000-0000-000000000003', 'clinica-vida', 'Clínica Vida', 'clinic', 'published', 'America/Sao_Paulo', 'pt-BR', 'BRL', 'CLIN01', 'sao paulo', 'moema', 'clinica', '10000000-0000-0000-0000-000000000003', now()),
+  -- Quarto estabelecimento: canal WhatsApp em modo texto (sem botões). Existe
+  -- para o e2e exercitar o modo sem alternar o de um tenant usado pelos demais
+  -- cenários, que correm em paralelo nos três projetos do Playwright.
+  ('20000000-0000-0000-0000-000000000004', 'estudio-texto', 'Estúdio Texto', 'nails', 'published', 'America/Sao_Paulo', 'pt-BR', 'BRL', 'TEXT01', 'sao paulo', 'pinheiros', 'manicure', '10000000-0000-0000-0000-000000000003', now())
 on conflict (id) do nothing;
 
 insert into public.tenant_members (
@@ -71,6 +75,12 @@ update public.tenant_profiles set
   email = 'contato@clinica-vida.local'
 where tenant_id = '20000000-0000-0000-0000-000000000003';
 
+update public.tenant_profiles set
+  description = 'Mãos e pés cuidados, com agendamento por mensagem de texto.',
+  phone = '+551130000004',
+  email = 'contato@estudio-texto.local'
+where tenant_id = '20000000-0000-0000-0000-000000000004';
+
 update public.theme_settings set primary_color = '#111827', accent_color = '#B45309', service_view = 'cards'
 where tenant_id = '20000000-0000-0000-0000-000000000001';
 update public.theme_settings set primary_color = '#4C1D3D', accent_color = '#9D174D', background_color = '#FFF7FB', service_view = 'cards', header_alignment = 'center'
@@ -83,7 +93,8 @@ insert into public.locations (
 ) values
   ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Centro', 'Rua da Agenda, 120', 'Centro', 'São Paulo', 'SP', '01000-000', true),
   ('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'Cambuí', 'Rua das Flores, 45', 'Cambuí', 'Campinas', 'SP', '13000-000', true),
-  ('30000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', 'Moema', 'Alameda Saúde, 88', 'Moema', 'São Paulo', 'SP', '04000-000', true)
+  ('30000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', 'Moema', 'Alameda Saúde, 88', 'Moema', 'São Paulo', 'SP', '04000-000', true),
+  ('30000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000004', 'Pinheiros', 'Rua dos Pinheiros, 300', 'Pinheiros', 'São Paulo', 'SP', '05400-000', true)
 on conflict (id) do nothing;
 
 insert into public.working_hours (tenant_id, location_id, day_of_week, opens_at, closes_at, break_starts_at, break_ends_at)
@@ -92,14 +103,16 @@ from (
   values
     ('20000000-0000-0000-0000-000000000001'::uuid, '30000000-0000-0000-0000-000000000001'::uuid, '09:00'::time, '19:00'::time, '12:00'::time, '13:00'::time),
     ('20000000-0000-0000-0000-000000000002'::uuid, '30000000-0000-0000-0000-000000000002'::uuid, '09:00'::time, '18:00'::time, '12:30'::time, '13:30'::time),
-    ('20000000-0000-0000-0000-000000000003'::uuid, '30000000-0000-0000-0000-000000000003'::uuid, '08:00'::time, '18:00'::time, '12:00'::time, '13:00'::time)
+    ('20000000-0000-0000-0000-000000000003'::uuid, '30000000-0000-0000-0000-000000000003'::uuid, '08:00'::time, '18:00'::time, '12:00'::time, '13:00'::time),
+    ('20000000-0000-0000-0000-000000000004'::uuid, '30000000-0000-0000-0000-000000000004'::uuid, '09:00'::time, '19:00'::time, '13:00'::time, '14:00'::time)
 ) hours(tenant_id, location_id, opens_at, closes_at, break_start, break_end)
 cross join generate_series(1, 6) day_number;
 
 insert into public.service_categories (id, tenant_id, name, sort_order) values
   ('40000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'Barbearia', 0),
   ('40000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'Cabelo', 0),
-  ('40000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', 'Consultas', 0)
+  ('40000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', 'Consultas', 0),
+  ('40000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000004', 'Unhas', 0)
 on conflict (id) do nothing;
 
 insert into public.services (
@@ -114,7 +127,9 @@ insert into public.services (
   ('42000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000002', 'Tratamento', 'Tratamento capilar conforme diagnóstico.', 60, 11000, 10, 120, 60, 2),
   ('43000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000003', 'Consulta', 'Consulta inicial com avaliação completa.', 60, 20000, 10, 240, 30, 0),
   ('43000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000003', 'Retorno', 'Acompanhamento do plano de cuidado.', 30, 0, 10, 240, 30, 1),
-  ('43000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000003', 'Avaliação', 'Avaliação direcionada para procedimento.', 45, 15000, 10, 240, 30, 2)
+  ('43000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000003', 'Avaliação', 'Avaliação direcionada para procedimento.', 45, 15000, 10, 240, 30, 2),
+  ('44000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000004', '40000000-0000-0000-0000-000000000004', 'Manicure', 'Cutilagem e esmaltação.', 45, 4500, 5, 60, 45, 0),
+  ('44000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000004', '40000000-0000-0000-0000-000000000004', 'Pedicure', 'Cuidado completo dos pés.', 45, 5000, 5, 60, 45, 1)
 on conflict (id) do nothing;
 
 insert into public.service_locations (tenant_id, service_id, location_id)
@@ -130,7 +145,9 @@ insert into public.staff (id, tenant_id, name, title, color, sort_order) values
   ('50000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000002', 'Ana', 'Cabeleireira', '#BE185D', 0),
   ('50000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000002', 'Marina', 'Colorista', '#C2410C', 1),
   ('50000000-0000-0000-0000-000000000005', '20000000-0000-0000-0000-000000000003', 'Dra. Camila', 'Clínica geral', '#0369A1', 0),
-  ('50000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000003', 'Dr. Bruno', 'Especialista', '#0F766E', 1)
+  ('50000000-0000-0000-0000-000000000006', '20000000-0000-0000-0000-000000000003', 'Dr. Bruno', 'Especialista', '#0F766E', 1),
+  ('50000000-0000-0000-0000-000000000007', '20000000-0000-0000-0000-000000000004', 'Bia', 'Manicure', '#9D174D', 0),
+  ('50000000-0000-0000-0000-000000000008', '20000000-0000-0000-0000-000000000004', 'Carla', 'Manicure', '#B45309', 1)
 on conflict (id) do nothing;
 
 insert into public.staff_locations (tenant_id, staff_id, location_id)
@@ -384,6 +401,16 @@ insert into public.whatsapp_phone_number_tenants (
     'support',
     false,
     'active'
+  ),
+  (
+    '92000000-0000-4000-8000-000000000006',
+    '91000000-0000-4000-8000-000000000001',
+    '20000000-0000-0000-0000-000000000004',
+    null,
+    'shared',
+    'booking',
+    true,
+    'active'
   )
 on conflict (id) do nothing;
 
@@ -446,6 +473,21 @@ insert into public.tenant_whatsapp_settings (
     20,
     'pt-BR',
     '{"mode":"mock","exclusive":true,"administrative_notice":"Canal destinado somente a agendamentos e informações administrativas. Em caso de emergência, procure o serviço de atendimento apropriado."}'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000004',
+    true,
+    '91000000-0000-4000-8000-000000000001',
+    true,
+    true,
+    true,
+    true,
+    true,
+    'Olá! Me diga o que quer agendar, com dia e horário se já souber.',
+    'Não entendi. Escreva o serviço, o dia e o horário que prefere.',
+    30,
+    'pt-BR',
+    '{"mode":"mock","interaction_mode":"text"}'
   )
 on conflict (tenant_id) do nothing;
 
@@ -492,6 +534,17 @@ insert into public.whatsapp_routing_codes (
     'EXCL01',
     'campaign_code',
     'exclusive-local',
+    'seed',
+    'active',
+    '{"simulated":true}'
+  ),
+  (
+    '93000000-0000-4000-8000-000000000005',
+    '20000000-0000-0000-0000-000000000004',
+    '91000000-0000-4000-8000-000000000001',
+    'TEXT01',
+    'permanent_tenant_code',
+    null,
     'seed',
     'active',
     '{"simulated":true}'

@@ -176,6 +176,13 @@ política entre canais.
 * [x] É possível configurar timeout de sessão — `session_timeout_minutes` (5–1440).
 * [x] É possível configurar idioma e fuso horário — `default_language`, `timezone`
   (validado contra `pg_timezone_names`).
+* [x] É possível escolher o modo de interação por tenant —
+  `metadata.interaction_mode` (`buttons` | `text`, ausente = `buttons`). Escolhido no
+  onboarding (`complete_tenant_onboarding`, 0027) e editável no painel WhatsApp por
+  owner/admin. `buttons` mantém botões e listas; `text` nunca envia interativo,
+  interpreta a frase do cliente com regras determinísticas (serviço, profissional,
+  data, hora, período, intenção — `domain/intent/`) e pergunta em texto o que falta
+  (`application/text-mode.ts`). Sem LLM.
 
 ## Roteamento
 
@@ -1498,6 +1505,9 @@ docs/whatsapp-meta-activation.md
                                    opt-in/opt-out, códigos de roteamento, lembretes com
                                    quiet hours, notificações.
 0023_whatsapp_webhook_rate_limit.sql (113 linhas) rate limit do webhook.
+0027_whatsapp_interaction_mode.sql (~220 linhas) recria `complete_tenant_onboarding`
+                                   com `p_whatsapp_interaction_mode` e cria a linha de
+                                   `tenant_whatsapp_settings` no onboarding.
 0024_whatsapp_retention.sql        (741 linhas)  policy de retenção, legal hold, redação
                                    e sweep em lotes.
 ```
@@ -1512,6 +1522,11 @@ tests/unit/whatsapp-*.test.ts(x)   17 arquivos — config, resolver, mock provid
                                    escopo de tenant, ordenação de webhook, rota do
                                    webhook, retenção, componentes, exportação.
 tests/unit/public-booking-whatsapp-consent.test.ts   opt-in vindo do site.
+tests/unit/whatsapp-intent-*.test.ts                 parser determinístico do modo texto
+                                   (data, hora, catálogo, frase); modo texto na máquina
+                                   de estados em whatsapp-state-machine.test.ts.
+tests/unit/whatsapp-settings-contract.test.ts        modo de interação no metadata.
+tests/unit/text-normalize.test.ts                    normalização pt-BR compartilhada.
 supabase/tests/whatsapp.test.sql   3282 linhas, plan(165) — RLS, isolamento entre
                                    tenants, constraints, workers, duplicação, ordem.
 tests/integration/booking-concurrency.test.ts        reserva concorrente real no banco.

@@ -207,6 +207,15 @@ sequenceDiagram
 - Máquina de estados produz respostas abstratas de texto, botão, lista e template.
   O contrato de Flow existe para evolução, mas o envio falha fechado enquanto a
   integração estiver desativada.
+- Cada estabelecimento escolhe o modo de interação
+  (`tenant_whatsapp_settings.metadata.interaction_mode`): `buttons` envia botões e
+  listas e trata texto digitado em pergunta de escolha como entrada inválida; `text`
+  nunca envia interativo e interpreta cada mensagem com regras determinísticas
+  (`domain/intent/`: serviço, profissional, data, hora, período, intenção), pulando
+  as etapas já respondidas e perguntando em texto o que falta
+  (`application/text-mode.ts`). Sem LLM: a mensagem do cliente não sai da plataforma.
+  Toda pergunta com opções passa por `presentOptions`, que decide o formato pelo modo.
+  Opt-out e comandos globais valem nos dois modos.
 - Gateway reutiliza disponibilidade, criação, cancelamento e reagendamento existentes.
 - Outbox entrega pelo provedor mock ou Meta sem bloquear transação de reserva.
 - Falha técnica permanente, ou transitória a partir da penúltima tentativa, move o inbound já

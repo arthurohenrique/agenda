@@ -15,7 +15,8 @@ Data de referência: 31 de julho de 2026.
 | Agenda, bloqueios e status | Implementado |
 | Realtime e relatórios | Implementado básico |
 | Notificações | Worker implementado; provedor externo pendente |
-| WhatsApp | Pipeline mock, inbox/outbox, roteamento, agenda, handoff, simulador e retenção implementados; Meta real pendente. Auditoria item a item: [relatório](whatsapp-validation-report.md) |
+| WhatsApp | Pipeline mock, inbox/outbox, roteamento, agenda, handoff, simulador e retenção implementados; em produção com número real desde agosto de 2026 ([lições](whatsapp-producao-licoes.md)). Auditoria item a item: [relatório](whatsapp-validation-report.md) |
+| WhatsApp — modo de interação | Implementado (30 de agosto de 2026): `buttons` (original) ou `text` por tenant, escolhido no onboarding e no painel; parser determinístico pt-BR sem LLM; migration `0027`; unit e pgTAP escritos, suíte de banco e e2e pendentes de execução na CI |
 | Exportação LGPD | Implementada por tenant |
 | Anonimização LGPD | Contatos técnicos órfãos do WhatsApp entram na retenção; identidade global em `customers` permanece pendente |
 | Observabilidade | Logger e health check; provedor externo pendente |

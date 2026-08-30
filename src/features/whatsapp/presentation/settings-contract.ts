@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  DEFAULT_WHATSAPP_INTERACTION_MODE,
+  parseWhatsAppInteractionMode,
+  whatsappInteractionModeSchema,
+  type WhatsAppInteractionMode,
+} from "../domain/interaction-mode";
 
 const checkboxSchema = z
   .enum(["on"])
@@ -17,6 +23,13 @@ export const quietHourSchema = z
   .string()
   .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 
+export {
+  DEFAULT_WHATSAPP_INTERACTION_MODE,
+  parseWhatsAppInteractionMode,
+  whatsappInteractionModeSchema,
+  type WhatsAppInteractionMode,
+} from "../domain/interaction-mode";
+
 export const tenantWhatsAppSettingsFormSchema = z.object({
   slug: z.string().trim().min(3).max(80),
   enabled: checkboxSchema,
@@ -25,6 +38,7 @@ export const tenantWhatsAppSettingsFormSchema = z.object({
   cancellationsEnabled: checkboxSchema,
   reschedulingEnabled: checkboxSchema,
   humanHandoffEnabled: checkboxSchema,
+  interactionMode: whatsappInteractionModeSchema.default(DEFAULT_WHATSAPP_INTERACTION_MODE),
   reminder24Hours: checkboxSchema,
   reminder2Hours: checkboxSchema,
   quietHoursEnabled: checkboxSchema,
@@ -71,6 +85,7 @@ export interface TenantWhatsAppMetadataPreferences {
   quietHoursEnd: string;
   administrativeNotice: string | null;
   emergencyNotice: string | null;
+  interactionMode: WhatsAppInteractionMode;
 }
 
 function optionalNotice(value: unknown): string | null {
@@ -105,6 +120,7 @@ export function parseTenantWhatsAppMetadata(value: unknown): TenantWhatsAppMetad
     quietHoursEnd: quietHours.success ? quietHours.data.end : "08:00",
     administrativeNotice: optionalNotice(metadata.administrative_notice),
     emergencyNotice: optionalNotice(metadata.emergency_notice),
+    interactionMode: parseWhatsAppInteractionMode(metadata.interaction_mode),
   };
 }
 
@@ -121,6 +137,7 @@ export function mergeTenantWhatsAppMetadata(
   ];
   metadata.administrative_notice = input.administrativeNotice;
   metadata.emergency_notice = input.emergencyNotice;
+  metadata.interaction_mode = input.interactionMode;
 
   if (input.quietHoursEnabled) {
     metadata.quiet_hours = { start: input.quietHoursStart, end: input.quietHoursEnd };
@@ -140,6 +157,7 @@ export function settingsInputFromFormData(formData: FormData): unknown {
     cancellationsEnabled: formData.get("cancellationsEnabled") ?? undefined,
     reschedulingEnabled: formData.get("reschedulingEnabled") ?? undefined,
     humanHandoffEnabled: formData.get("humanHandoffEnabled") ?? undefined,
+    interactionMode: formData.get("interactionMode") ?? undefined,
     reminder24Hours: formData.get("reminder24Hours") ?? undefined,
     reminder2Hours: formData.get("reminder2Hours") ?? undefined,
     quietHoursEnabled: formData.get("quietHoursEnabled") ?? undefined,

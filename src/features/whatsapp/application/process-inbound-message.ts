@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { WhatsAppInteractionMode } from "../domain/interaction-mode";
+
 import { transitionConversation, type ConversationCapabilities, type InboundConversationMessage } from "./transition-conversation";
 import { SupabaseWhatsAppBookingGateway, type WhatsAppBookingGateway } from "./booking-gateway";
 import {
@@ -75,11 +77,26 @@ async function isStaleInteractiveReply(
   return message.providerReplyToId !== latest;
 }
 
+// Toque em botão só existe no modo botões, mas o estabelecimento pode ter
+// trocado de modo com a conversa aberta. A repetição respeita o modo atual.
+async function promptModeFor(
+  gateway: WhatsAppBookingGateway,
+  tenantId: string | null,
+): Promise<WhatsAppInteractionMode> {
+  if (!tenantId) return "buttons";
+  try {
+    return (await gateway.getTenantContext(tenantId)).interactionMode;
+  } catch {
+    return "buttons";
+  }
+}
+
 function repeatCurrentPrompt(
   conversation: PersistedConversation,
   message: InboundConversationMessage,
   capabilities: ConversationCapabilities,
   reason: "multiple" | "already_answered",
+  mode: WhatsAppInteractionMode,
 ): ConversationTransition {
   return {
     state: conversation.currentState,
@@ -102,6 +119,7 @@ function repeatCurrentPrompt(
         ].filter(Boolean).join("\n\n"),
         conversation.context.options,
         capabilities.maxReplyButtons,
+        mode,
       ),
     ],
   };
@@ -234,6 +252,7 @@ export async function processInboundMessage(
           message,
           capabilities,
           siblings.length > 0 ? "multiple" : "already_answered",
+          await promptModeFor(gateway, transitionView.tenantId),
         ),
       }
       : await transitionConversation({

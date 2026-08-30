@@ -43,7 +43,8 @@ reagenda com backoff. As três RPCs aceitam somente `service_role`.
 
 - Contas e números: `whatsapp_business_accounts`, `whatsapp_phone_numbers`,
   `whatsapp_phone_number_tenants`
-- Configuração e roteamento: `tenant_whatsapp_settings`,
+- Configuração e roteamento: `tenant_whatsapp_settings` (inclui
+  `metadata.interaction_mode`: `buttons` ou `text`; ausente = `buttons`),
   `whatsapp_routing_codes`, `whatsapp_routing_code_uses`
 - Identidade e conversa: `whatsapp_contacts`, `whatsapp_conversations`,
   `whatsapp_messages`
@@ -204,3 +205,11 @@ usar as colunas `jsonb` já existentes nas entidades principais.
   núcleo lidas pelo cliente admin do servidor, inclusive as que entram por embed do
   PostgREST. Sem isso o gateway do WhatsApp e o worker de notificações falham com
   `permission denied`.
+- `0026_whatsapp_terminal_reply_delivery.sql`: `validate_whatsapp_outbox_delivery`
+  passa a aceitar `conversation_reply` com a conversa em `completed` ou `closed`, para
+  que a última mensagem de confirmação, reagendamento e cancelamento seja entregue.
+- `0027_whatsapp_interaction_mode.sql`: recria `complete_tenant_onboarding` com
+  `p_whatsapp_interaction_mode` (`buttons` | `text`, default `buttons`) e passa a criar
+  a linha de `tenant_whatsapp_settings` no onboarding, com o modo em
+  `metadata.interaction_mode` e o canal desligado. A assinatura antiga é removida para
+  não coexistirem duas sobrecargas.

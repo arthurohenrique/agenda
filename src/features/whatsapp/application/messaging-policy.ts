@@ -1,5 +1,7 @@
 import "server-only";
 
+import { normalizeCommand } from "@/lib/text/normalize";
+
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -162,12 +164,7 @@ const optOutExpressions = [
 ] as const;
 
 export function isExplicitOptOut(input: string): boolean {
-  const normalized = input
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR")
-    .trim()
-    .replace(/[.!?]+$/g, "");
+  const normalized = normalizeCommand(input);
   return optOutExpressions.some((expression) => normalized === expression);
 }
 

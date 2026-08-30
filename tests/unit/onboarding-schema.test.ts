@@ -27,6 +27,20 @@ describe("onboarding", () => {
     expect(onboardingSchema.safeParse({ ...validOnboarding, slug: "admin" }).success).toBe(false);
   });
 
+  it("assume botões no WhatsApp quando o modo não é informado", () => {
+    const parsed = onboardingSchema.safeParse(validOnboarding);
+    expect(parsed.success && parsed.data.whatsappInteractionMode).toBe("buttons");
+  });
+
+  it("aceita modo texto e recusa modo desconhecido", () => {
+    expect(
+      onboardingSchema.safeParse({ ...validOnboarding, whatsappInteractionMode: "text" }).success,
+    ).toBe(true);
+    expect(
+      onboardingSchema.safeParse({ ...validOnboarding, whatsappInteractionMode: "voice" }).success,
+    ).toBe(false);
+  });
+
   it("bloqueia cor principal sem contraste", () => {
     expect(
       onboardingSchema.safeParse({ ...validOnboarding, primaryColor: "#EEEEEE" }).success,

@@ -1,3 +1,5 @@
+import { stripDiacritics } from "@/lib/text/normalize";
+
 export const reservedSlugs = new Set([
   "app",
   "api",
@@ -18,9 +20,7 @@ export const reservedSlugs = new Set([
 ]);
 
 export function normalizeSlug(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+  return stripDiacritics(value)
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
