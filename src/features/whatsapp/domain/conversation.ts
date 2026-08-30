@@ -75,6 +75,9 @@ const bookingDraftSchema = z.object({
   // estarem definidos. Aplicados quando os horários do dia são consultados.
   requestedTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
   requestedPeriod: z.enum(["morning", "afternoon", "evening"]).optional(),
+  // Nome de profissional pedido que não existe no cadastro. Fica até o
+  // profissional ser resolvido, para o aviso sair no passo certo.
+  requestedStaffName: z.string().max(80).optional(),
 });
 
 export const conversationContextSchema = z.object({

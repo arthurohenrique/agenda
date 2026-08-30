@@ -746,6 +746,19 @@ describe("WhatsApp conversation state machine", () => {
       { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", name: "Maria" },
       { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000002", name: "Joana" },
     ];
+    // 2026-09-01T13:00Z e 17:00Z são 10:00 e 14:00 em São Paulo.
+    const slot10 = {
+      startAt: "2026-09-01T13:00:00.000Z",
+      endAt: "2026-09-01T14:00:00.000Z",
+      staffId: staff[0]!.id,
+      staffName: "Maria",
+    };
+    const slot14 = {
+      startAt: "2026-09-01T17:00:00.000Z",
+      endAt: "2026-09-01T18:00:00.000Z",
+      staffId: staff[0]!.id,
+      staffName: "Maria",
+    };
 
     async function textGateway(): Promise<WhatsAppBookingGateway> {
       const bookingGateway = gateway();
@@ -756,20 +769,7 @@ describe("WhatsApp conversation state machine", () => {
       vi.mocked(bookingGateway.listServices).mockResolvedValue([service]);
       vi.mocked(bookingGateway.listStaff).mockResolvedValue(staff);
       vi.mocked(bookingGateway.listAllStaff).mockResolvedValue(staff);
-      vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([
-        {
-          startAt: "2026-09-01T13:00:00.000Z",
-          endAt: "2026-09-01T14:00:00.000Z",
-          staffId: staff[0]!.id,
-          staffName: "Maria",
-        },
-        {
-          startAt: "2026-09-01T17:00:00.000Z",
-          endAt: "2026-09-01T18:00:00.000Z",
-          staffId: staff[0]!.id,
-          staffName: "Maria",
-        },
-      ]);
+      vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([slot10, slot14]);
       return bookingGateway;
     }
 
@@ -780,7 +780,16 @@ describe("WhatsApp conversation state machine", () => {
       );
     }
 
-    it("conduz o agendamento inteiro só com texto e opções numeradas", async () => {
+    function bodyOf(transition: { responses: readonly { kind: string; body?: string }[] }) {
+      onlyText(transition.responses);
+      const body = transition.responses.map((response) => response.body ?? "").join("\n");
+      // Nada de lista numerada nem emoji abaixo do limite.
+      expect(body).not.toMatch(/^\d+ — /m);
+      expect(body).not.toMatch(/\p{Extended_Pictographic}/u);
+      return body;
+    }
+
+    it("conduz o agendamento inteiro como uma conversa", async () => {
       const bookingGateway = await textGateway();
       mocks.resolveWhatsAppTenant.mockResolvedValue({
         kind: "resolved",
@@ -791,6 +800,14 @@ describe("WhatsApp conversation state machine", () => {
         customerId: ids.customer,
         customerTenantId: "99999999-9999-4999-8999-999999999999",
       });
+      vi.mocked(bookingGateway.createBooking).mockResolvedValue({
+        appointmentId: ids.appointment,
+        managementToken: "token",
+        status: "confirmed",
+        startsAt: slot14.startAt,
+        endsAt: slot14.endAt,
+        staffName: "Maria",
+      });
 
       const start = await transitionConversation(
         transitionInput({
@@ -800,13 +817,11 @@ describe("WhatsApp conversation state machine", () => {
         }),
       );
       expect(start.transition.state).toBe("SERVICE_SELECTION");
-      onlyText(start.transition.responses);
-      expect(start.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("1 — Corte feminino"),
-      });
+      expect(bodyOf(start.transition)).toContain("A gente faz corte feminino. Qual você quer?");
 
-      // O rótulo escrito por extenso vale como a chave.
-      const preference = await transitionConversation(
+      // Nome do serviço por extenso vale como escolha; a pergunta de
+      // profissional é uma só, com "tanto faz" como alternativa.
+      const staffAsk = await transitionConversation(
         transitionInput({
           text: "corte feminino",
           bookingGateway,
@@ -816,24 +831,10 @@ describe("WhatsApp conversation state machine", () => {
           }),
         }),
       );
-      expect(preference.transition.state).toBe("STAFF_PREFERENCE");
-      onlyText(preference.transition.responses);
-      expect(preference.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("2 — Quero escolher"),
-      });
-
-      const staffList = await transitionConversation(
-        transitionInput({
-          text: "Quero escolher!",
-          bookingGateway,
-          conversation: conversation({
-            currentState: "STAFF_PREFERENCE",
-            context: preference.transition.context,
-          }),
-        }),
+      expect(staffAsk.transition.state).toBe("STAFF_SELECTION");
+      expect(bodyOf(staffAsk.transition)).toBe(
+        "Beleza, corte feminino. Prefere algum profissional pra corte feminino? Tem Maria e Joana. Ou tanto faz?",
       );
-      expect(staffList.transition.state).toBe("STAFF_SELECTION");
-      onlyText(staffList.transition.responses);
 
       const dates = await transitionConversation(
         transitionInput({
@@ -841,14 +842,15 @@ describe("WhatsApp conversation state machine", () => {
           bookingGateway,
           conversation: conversation({
             currentState: "STAFF_SELECTION",
-            context: staffList.transition.context,
+            context: staffAsk.transition.context,
           }),
         }),
       );
       expect(dates.transition.state).toBe("DATE_SELECTION");
       expect(dates.transition.context.booking.staffName).toBe("Maria");
-      onlyText(dates.transition.responses);
+      expect(bodyOf(dates.transition)).toContain("Beleza, com Maria. Que dia fica bom pra você?");
 
+      // Número continua aceito em silêncio.
       const slots = await transitionConversation(
         transitionInput({
           text: "1",
@@ -860,14 +862,13 @@ describe("WhatsApp conversation state machine", () => {
         }),
       );
       expect(slots.transition.state).toBe("SLOT_SELECTION");
-      onlyText(slots.transition.responses);
-      expect(slots.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("9 — Escolher outra data"),
-      });
+      expect(bodyOf(slots.transition)).toBe(
+        "Beleza! Você quer corte feminino hoje com Maria, certo? Olha, hoje a gente ainda tem 10:00 e 14:00. Qual prefere?",
+      );
 
       const name = await transitionConversation(
         transitionInput({
-          text: "2",
+          text: "pode ser o último",
           bookingGateway,
           conversation: conversation({
             currentState: "SLOT_SELECTION",
@@ -876,7 +877,8 @@ describe("WhatsApp conversation state machine", () => {
         }),
       );
       expect(name.transition.state).toBe("CUSTOMER_IDENTIFICATION");
-      expect(name.transition.context.booking.startsAt).toBe("2026-09-01T17:00:00.000Z");
+      expect(name.transition.context.booking.startsAt).toBe(slot14.startAt);
+      expect(bodyOf(name.transition)).toBe("Só me diz seu nome completo pra eu deixar reservado.");
 
       const review = await transitionConversation(
         transitionInput({
@@ -889,29 +891,66 @@ describe("WhatsApp conversation state machine", () => {
         }),
       );
       expect(review.transition.state).toBe("BOOKING_CONFIRMATION");
-      onlyText(review.transition.responses);
-      expect(review.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("1 — Confirmar"),
-      });
+      expect(bodyOf(review.transition)).toMatch(
+        /^Então fica assim: corte feminino, .* às 14:00 com Maria, no nome de Ana Silva\. Posso confirmar\?$/,
+      );
+
+      // "não" sozinho não diz se é trocar ou desistir.
+      const unsure = await transitionConversation(
+        transitionInput({
+          text: "não",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "BOOKING_CONFIRMATION",
+            context: review.transition.context,
+          }),
+        }),
+      );
+      expect(unsure.transition.state).toBe("BOOKING_CONFIRMATION");
+      expect(bodyOf(unsure.transition)).toBe("Entendi que não. Quer trocar o horário ou cancelar de vez?");
+
+      const done = await transitionConversation(
+        transitionInput({
+          text: "Pode confirmar!",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "BOOKING_CONFIRMATION",
+            context: review.transition.context,
+          }),
+        }),
+      );
+      expect(done.transition.state).toBe("BOOKING_COMPLETED");
+      expect(bookingGateway.createBooking).toHaveBeenCalledTimes(1);
+      expect(bodyOf(done.transition)).toMatch(/^Fechado! Corte feminino confirmado pra .* às 14:00 com Maria\./);
+
+      const gaveUp = await transitionConversation(
+        transitionInput({
+          text: "deixa pra lá",
+          bookingGateway,
+          conversation: conversation({
+            currentState: "BOOKING_CONFIRMATION",
+            context: review.transition.context,
+          }),
+        }),
+      );
+      expect(gaveUp.transition.state).toBe("CANCELLED");
+      expect(bodyOf(gaveUp.transition)).toContain("Tudo bem, deixei de lado.");
     });
 
-    it("reapresenta as opções em texto e encaminha na terceira entrada inválida", async () => {
+    it("repete a pergunta do passo em texto natural e encaminha na terceira falha", async () => {
       const bookingGateway = await textGateway();
       const context = conversationContextSchema.parse({
-        booking: { serviceId: service.id },
-        options: [
-          { key: "1", label: "Sem preferência", value: "any", kind: "action" },
-          { key: "2", label: "Quero escolher", value: "choose", kind: "action" },
-        ],
+        booking: { serviceId: service.id, serviceName: service.name },
+        options: staff.map((person, index) => ({
+          key: String(index + 1), label: person.name, value: person.id, kind: "staff",
+        })),
       });
 
-      // "tanto faz" é entendido pelo parser como "sem preferência"; a entrada
-      // inválida precisa não dizer nada.
       const shrug = await transitionConversation(
         transitionInput({
           text: "tanto faz",
           bookingGateway,
-          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+          conversation: conversation({ currentState: "STAFF_SELECTION", context }),
         }),
       );
       expect(shrug.transition.state).toBe("DATE_SELECTION");
@@ -921,25 +960,19 @@ describe("WhatsApp conversation state machine", () => {
         transitionInput({
           text: "hmmmm",
           bookingGateway,
-          conversation: conversation({ currentState: "STAFF_PREFERENCE", context }),
+          conversation: conversation({ currentState: "STAFF_SELECTION", context }),
         }),
       );
-      expect(first.transition.state).toBe("STAFF_PREFERENCE");
-      onlyText(first.transition.responses);
-      expect(first.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("Responda 1 para sem preferência ou 2 para escolher."),
-      });
-      expect(first.transition.responses[0]).toMatchObject({
-        body: expect.stringContaining("1 — Sem preferência"),
-      });
+      expect(first.transition.state).toBe("STAFF_SELECTION");
+      expect(bodyOf(first.transition)).toBe("Não entendi. Prefere Maria ou Joana — ou tanto faz?");
 
       const third = await transitionConversation(
         transitionInput({
           text: "hmmmm",
           bookingGateway,
           conversation: conversation({
-            currentState: "STAFF_PREFERENCE",
-            context: { ...context, attempts: { STAFF_PREFERENCE: 2 } },
+            currentState: "STAFF_SELECTION",
+            context: { ...context, attempts: { STAFF_SELECTION: 2 } },
           }),
         }),
       );
@@ -948,24 +981,9 @@ describe("WhatsApp conversation state machine", () => {
 
     describe("frase interpretada", () => {
       // 2026-08-31 é segunda-feira em São Paulo; "sexta" é 2026-09-04.
-      const friday14 = {
-        startAt: "2026-09-04T17:00:00.000Z",
-        endAt: "2026-09-04T18:00:00.000Z",
-        staffId: staff[0]!.id,
-        staffName: "Maria",
-      };
-      const friday10 = {
-        startAt: "2026-09-04T13:00:00.000Z",
-        endAt: "2026-09-04T14:00:00.000Z",
-        staffId: staff[0]!.id,
-        staffName: "Maria",
-      };
-      const friday16 = {
-        startAt: "2026-09-04T19:00:00.000Z",
-        endAt: "2026-09-04T20:00:00.000Z",
-        staffId: staff[0]!.id,
-        staffName: "Maria",
-      };
+      const friday10 = { ...slot10, startAt: "2026-09-04T13:00:00.000Z", endAt: "2026-09-04T14:00:00.000Z" };
+      const friday14 = { ...slot14, startAt: "2026-09-04T17:00:00.000Z", endAt: "2026-09-04T18:00:00.000Z" };
+      const friday16 = { ...slot14, startAt: "2026-09-04T19:00:00.000Z", endAt: "2026-09-04T20:00:00.000Z" };
 
       beforeEach(() => {
         vi.useFakeTimers({ toFake: ["Date"] });
@@ -978,6 +996,91 @@ describe("WhatsApp conversation state machine", () => {
 
       afterEach(() => {
         vi.useRealTimers();
+      });
+
+      it("entende gíria e nome que não existe, e oferece quem atende", async () => {
+        const bookingGateway = await textGateway();
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "Corte feminino com Raul hj",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("STAFF_SELECTION");
+        expect(result.transition.context.booking).toMatchObject({
+          serviceId: service.id,
+          date: "2026-08-31",
+        });
+        expect(result.transition.context.booking.staffId).toBeUndefined();
+        expect(result.transition.context.booking.requestedStaffName).toBeUndefined();
+        expect(bodyOf(result.transition)).toBe(
+          "Beleza, corte feminino hoje. Só não achei ninguém chamado Raul por aqui. Corte feminino quem faz é Maria e Joana. Prefere algum deles ou tanto faz?",
+        );
+
+        const slots = await transitionConversation(
+          transitionInput({
+            text: "tanto faz",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "STAFF_SELECTION",
+              context: result.transition.context,
+            }),
+          }),
+        );
+        expect(slots.transition.state).toBe("SLOT_SELECTION");
+        expect(bodyOf(slots.transition)).toBe(
+          "Beleza! Você quer corte feminino hoje, certo? Olha, hoje a gente ainda tem 10:00 e 14:00. Qual prefere?",
+        );
+
+        const chosen = await transitionConversation(
+          transitionInput({
+            text: "14h",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "SLOT_SELECTION",
+              context: slots.transition.context,
+            }),
+          }),
+        );
+        expect(chosen.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+        expect(chosen.transition.context.booking.startsAt).toBe(slot14.startAt);
+      });
+
+      it("guarda o nome pedido até saber o serviço", async () => {
+        const bookingGateway = await textGateway();
+        const asked = await transitionConversation(
+          transitionInput({
+            text: "amn de tarde com o Raul",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(asked.transition.state).toBe("SERVICE_SELECTION");
+        expect(asked.transition.context.booking).toMatchObject({
+          date: "2026-09-01",
+          requestedPeriod: "afternoon",
+          requestedStaffName: "Raul",
+        });
+        expect(bodyOf(asked.transition)).toBe(
+          "Beleza, amanhã à tarde. Só não achei ninguém chamado Raul por aqui. A gente faz corte feminino. Qual você quer?",
+        );
+
+        const staffAsk = await transitionConversation(
+          transitionInput({
+            text: "corte feminino",
+            bookingGateway,
+            conversation: conversation({
+              currentState: "SERVICE_SELECTION",
+              context: asked.transition.context,
+            }),
+          }),
+        );
+        expect(staffAsk.transition.state).toBe("STAFF_SELECTION");
+        expect(bodyOf(staffAsk.transition)).toContain("Só não achei ninguém chamado Raul por aqui.");
+        expect(staffAsk.transition.context.booking.requestedStaffName).toBeUndefined();
       });
 
       it("preenche serviço, profissional, data e hora de uma vez e pede só o nome", async () => {
@@ -998,30 +1101,21 @@ describe("WhatsApp conversation state machine", () => {
         expect(result.transition.state).toBe("CUSTOMER_IDENTIFICATION");
         expect(result.transition.context.booking).toMatchObject({
           serviceId: service.id,
-          serviceName: "Corte feminino",
           staffId: staff[0]!.id,
-          staffName: "Maria",
           date: "2026-09-04",
           requestedTime: "14:00",
           startsAt: friday14.startAt,
-          endsAt: friday14.endAt,
           locationId: ids.location,
         });
-        expect(bookingGateway.listStaff).toHaveBeenCalledWith(ids.tenant, service.id);
         expect(bookingGateway.getAvailableSlots).toHaveBeenCalledWith(expect.objectContaining({
-          serviceId: service.id,
           staffId: staff[0]!.id,
           rangeStart: "2026-09-04T03:00:00.000Z",
           rangeEnd: "2026-09-05T03:00:00.000Z",
         }));
         expect(mocks.attachContactToTenant).toHaveBeenCalledTimes(1);
-        onlyText(result.transition.responses);
-        expect(result.transition.responses[0]).toMatchObject({
-          body: expect.stringContaining("Anotei: Corte feminino"),
-        });
-        expect(result.transition.responses.at(-1)).toMatchObject({
-          body: "Para concluir, informe seu nome completo.",
-        });
+        expect(bodyOf(result.transition)).toBe(
+          "Fechado, na sexta (4/9) às 14:00 com Maria. Só me diz seu nome completo pra eu deixar reservado.",
+        );
       });
 
       it("vai direto ao resumo quando o nome já é conhecido", async () => {
@@ -1043,9 +1137,7 @@ describe("WhatsApp conversation state machine", () => {
         );
 
         expect(result.transition.state).toBe("BOOKING_CONFIRMATION");
-        expect(result.transition.responses.at(-1)).toMatchObject({
-          body: expect.stringContaining("Nome: Ana Silva"),
-        });
+        expect(bodyOf(result.transition)).toContain("no nome de Ana Silva. Posso confirmar?");
         expect(mocks.attachContactToTenant).not.toHaveBeenCalled();
       });
 
@@ -1062,11 +1154,10 @@ describe("WhatsApp conversation state machine", () => {
         );
 
         expect(result.transition.state).toBe("SLOT_SELECTION");
-        expect(result.transition.context.options.filter((option) => option.kind === "slot"))
-          .toHaveLength(2);
-        expect(result.transition.responses.at(-1)).toMatchObject({
-          body: expect.stringContaining("Não tenho 14:00"),
-        });
+        expect(result.transition.context.options.filter((option) => option.kind === "slot")).toHaveLength(2);
+        expect(bodyOf(result.transition)).toBe(
+          "Beleza, corte feminino na sexta (4/9) com Maria. Às 14:00 na sexta (4/9) já foi. O mais perto que tenho é 10:00 ou 16:00 — serve algum?",
+        );
       });
 
       it("filtra os horários pelo período do dia", async () => {
@@ -1090,6 +1181,7 @@ describe("WhatsApp conversation state machine", () => {
             .filter((option) => option.kind === "slot")
             .map((option) => option.label),
         ).toEqual(["14:00 · Maria", "16:00 · Maria"]);
+        expect(bodyOf(result.transition)).toContain("a gente ainda tem 14:00 e 16:00. Qual prefere?");
       });
 
       it("guarda data e hora ditas antes do serviço e as aproveita depois", async () => {
@@ -1106,9 +1198,9 @@ describe("WhatsApp conversation state machine", () => {
         );
         expect(asked.transition.state).toBe("SERVICE_SELECTION");
         expect(asked.transition.context.booking).toMatchObject({ date: "2026-09-04", requestedTime: "14:00" });
-        expect(asked.transition.responses[0]).toMatchObject({
-          body: expect.stringContaining("Anotei: sexta-feira, 4 de setembro · 14:00."),
-        });
+        expect(bodyOf(asked.transition)).toBe(
+          "Beleza, na sexta (4/9) às 14:00. A gente faz corte feminino. Qual você quer?",
+        );
 
         const chosen = await transitionConversation(
           transitionInput({
@@ -1145,11 +1237,9 @@ describe("WhatsApp conversation state machine", () => {
           "bbbbbbbb-bbbb-4bbb-8bbb-000000000003",
         ]);
         expect(result.transition.context.booking.staffId).toBeUndefined();
-        expect(result.transition.responses.map((response) => response.kind === "text" ? response.body : "")).toEqual([
-          "Anotei: Corte feminino.",
-          "Há mais de um profissional com esse nome. Qual deles?",
-          expect.stringContaining("1 — Maria"),
-        ]);
+        expect(bodyOf(result.transition)).toBe(
+          "Beleza, corte feminino. Tem mais de um Maria por aqui. Pode ser Maria ou Maria. Qual deles?",
+        );
       });
 
       it("avisa quando a profissional não atende o serviço", async () => {
@@ -1166,9 +1256,9 @@ describe("WhatsApp conversation state machine", () => {
 
         expect(result.transition.state).toBe("STAFF_SELECTION");
         expect(result.transition.context.options.map((option) => option.value)).toEqual([staff[1]!.id]);
-        expect(result.transition.responses.some((response) =>
-          response.kind === "text" && response.body.includes("Maria não atende Corte feminino")
-        )).toBe(true);
+        expect(bodyOf(result.transition)).toBe(
+          "Beleza, corte feminino com Maria. Maria não atende corte feminino. Quem faz é Joana. Prefere algum deles ou tanto faz?",
+        );
       });
 
       it("encaminha pedidos de atendente e de agendamentos existentes", async () => {

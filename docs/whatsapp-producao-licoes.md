@@ -94,6 +94,21 @@ Correção em camadas:
 - Comparação com a última saída: pega toques em balões bem mais antigos.
 - Janela de acomodação de 1s antes de transicionar, só para toque de botão.
 
+### 7. Frase com gíria e nome que não existe
+
+Primeiro uso do modo texto na Barbearia Central: "Corte e barba com Raul hj". O
+parser pegou só o serviço. "hj" não era "hoje" e "Raul" foi ignorado em silêncio
+porque não há Raul no cadastro — o cliente não recebeu nenhum sinal de que pediu
+algo inexistente, e a resposta veio como lista numerada ("1 — Sem preferência").
+
+Correção: dicionário de gírias por palavra inteira antes de qualquer parser
+(`domain/intent/slang.ts`), extração do nome pedido quando o cadastro não casa
+(`booking.requestedStaffName`, respondido com "Não achei ninguém chamado Raul por
+aqui. Quem faz é Rafael e Diego — prefere algum deles ou tanto faz?"), e copy em
+prosa (`presentation/text-mode-copy.ts`) no lugar das listas numeradas. Decisão de
+produto registrada: tom informal, sem emoji; nome ausente avisa e oferece quem atende
+em vez de seguir sem preferência.
+
 ## Invariantes que não podem ser quebrados
 
 **Gravar mensagem → travar conversa → transicionar.** Nessa ordem. A gravação

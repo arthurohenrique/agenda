@@ -113,16 +113,25 @@ estabelecimento e pode ser mudada depois em **Configurações › WhatsApp**.
 
 - **Botões e listas**: o cliente toca nas opções. Se digitar algo numa pergunta de
   escolha, o bot repete as opções.
-- **Somente texto**: não há botões. O cliente escreve como quiser e o bot entende
-  serviço, profissional, dia, horário e período ("de tarde"). O que faltar é
-  perguntado em texto, com opções numeradas — o cliente responde com o número ou
-  com o nome.
+- **Somente texto**: não há botões. O cliente escreve como quiser e o bot responde
+  como uma pessoa: entende serviço, profissional, dia, horário e período ("de
+  tarde"), repete o que entendeu e pergunta só o que falta. Exemplo:
 
-Exemplos que o modo texto entende: "quero agendar corte sexta às 14h com a Maria",
-"manicure amanhã de tarde", "dia 15 às 10", "tanto faz o profissional". Se o
-horário pedido não existir, o bot oferece os mais próximos do dia. Se houver dois
-profissionais com o mesmo nome, ele pergunta qual. Em qualquer modo, "Menu",
-"Cancelar" e "Atendente" continuam funcionando.
+  > Cliente: *Corte e barba com Raul hj*
+  > Bot: *Beleza, corte e barba hoje. Só não achei ninguém chamado Raul por aqui.
+  > Corte e barba quem faz é Rafael e Diego. Prefere algum deles ou tanto faz?*
+  > Cliente: *tanto faz*
+  > Bot: *Beleza! Você quer corte e barba hoje, certo? Olha, hoje a gente ainda tem
+  > 14:00, 15:30 e 16:00. Qual prefere?*
+
+O modo texto entende gírias e abreviações comuns ("hj", "amn", "sex", "14 e meia",
+"blz"), respostas como "sim", "pode confirmar", "não, outro horário" ou "cancela",
+e atalhos como "o primeiro" e "o último" ao escolher horário. Se o horário pedido
+não existir, ele oferece os mais próximos do dia. Se o cliente citar um profissional
+que não existe, o bot avisa e lista quem atende. Se houver dois profissionais com o
+mesmo nome, ele pergunta qual. As alternativas aparecem na própria frase; só listas
+muito longas viram itens. Em qualquer modo, "Menu", "Cancelar" e "Atendente"
+continuam funcionando.
 
 ## 13. Boas práticas
 
@@ -144,6 +153,7 @@ profissionais com o mesmo nome, ele pergunta qual. Em qualquer modo, "Menu",
 | Página pública não abre | Revise o checklist de publicação |
 | Horário ficou indisponível | Outro agendamento ou bloqueio ocupou o intervalo |
 | Bot do WhatsApp não entende as frases | Confirme o modo "Somente texto" em Configurações › WhatsApp; no modo Botões o texto digitado só repete as opções |
+| Cliente pediu um profissional que não existe | O bot avisa e lista quem atende; confira se o nome no cadastro é o que os clientes usam (apelido) |
 
 Em caso de dúvida, envie ao suporte o nome do estabelecimento, a tela acessada e o
 horário aproximado do problema. Nunca envie senha ou chave de API.

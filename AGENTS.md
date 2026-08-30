@@ -136,6 +136,13 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
   ponto de `transitionConversation`, só nos `INTENT_CAPABLE_STATES`; nunca em nome,
   busca ou sim/não). Em `buttons` o parser não roda. Não adicione um segundo parser
   nem chame LLM: a decisão registrada é regra determinística.
+- Frases do modo texto ficam só em `presentation/text-mode-copy.ts` (uma função por
+  situação; tom informal, sem emoji; uma pergunta por mensagem; alternativas inline
+  até 6, numeradas só acima de 12). Não escreva copy de modo texto dentro de handler.
+  Gírias: `domain/intent/slang.ts` (palavra inteira, com guarda para "ter"/"sex").
+  Pergunta fechada (`AFFIRMATION_STATES`) usa `parseAffirmation`, nunca o parser
+  completo. Nome fora do cadastro vai em `booking.requestedStaffName` e é consumido
+  no passo de profissional — nunca cria profissional.
 - Normalização pt-BR (acentos, caixa, pontuação) em `src/lib/text/normalize.ts`.
   Não reimplemente NFD inline.
 

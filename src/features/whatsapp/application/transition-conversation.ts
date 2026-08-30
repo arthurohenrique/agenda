@@ -31,6 +31,7 @@ import {
 } from "./booking-gateway";
 import { isExplicitOptOut, recordOptOut } from "./messaging-policy";
 import { handleTextModeMessage, type TextModeSteps } from "./text-mode";
+import * as copy from "../presentation/text-mode-copy";
 import {
   type WhatsAppContact,
   type WhatsAppPhoneNumber,
@@ -109,6 +110,7 @@ function present(
   maxReplyButtons: number,
   listButtonText?: string,
   hint?: string | null,
+  prose = false,
 ): ConversationResponse {
   return presentOptions({
     mode,
@@ -117,7 +119,37 @@ function present(
     maxReplyButtons,
     ...(listButtonText === undefined ? {} : { listButtonText }),
     ...(hint === undefined ? {} : { hint }),
+    prose,
   });
+}
+
+// Modo texto: o corpo em prosa vem do copy; a lista numerada fica só para
+// listas longas, que o próprio copy numera.
+function prose(mode: WhatsAppInteractionMode, body: string): ConversationResponse {
+  return presentOptions({ mode, body, options: [], maxReplyButtons: 0, prose: true });
+}
+
+function copyItems(options: readonly ConversationOption[]): copy.CopyItem[] {
+  return options
+    .filter((option) => option.kind !== "page" && option.kind !== "action")
+    .map((option) => ({ key: option.key, label: option.label }));
+}
+
+function slotCopyItems(
+  options: readonly ConversationOption[],
+  timezone: string,
+): copy.SlotCopyItem[] {
+  return options
+    .filter((option) => option.kind === "slot")
+    .map((option) => {
+      const [startsAt, , , ...staffNameParts] = option.value.split("|");
+      return {
+        key: option.key,
+        label: option.label,
+        time: startsAt ? formatTimeInTimezone(startsAt, timezone) : option.label,
+        staffName: staffNameParts.join("|"),
+      };
+    });
 }
 
 function tenantLabel(tenant: TenantCandidate): string {
@@ -228,6 +260,8 @@ function serviceSelectionTransition(input: {
   context: ConversationContext;
   offset?: number;
   greeting?: string;
+  // Modo texto: corpo em prosa já pronto (copy). Sem ele, a pergunta padrão.
+  body?: string;
 }): ConversationTransition {
   const options = pagedOptions({
     items: input.services,
@@ -251,14 +285,15 @@ function serviceSelectionTransition(input: {
       lastPromptAt: new Date().toISOString(),
     }),
     responses: [
-      present(
-        input.mode,
-        input.greeting ?? "Qual serviço deseja agendar?",
-        options,
-        input.capabilities.maxReplyButtons,
-        "Escolher serviço",
-        "Responda com o número do serviço.",
-      ),
+      input.mode === "text"
+        ? prose(input.mode, input.body ?? copy.askService({ services: copyItems(options) }))
+        : present(
+          input.mode,
+          input.greeting ?? "Qual serviço deseja agendar?",
+          options,
+          input.capabilities.maxReplyButtons,
+          "Escolher serviço",
+        ),
     ],
   };
 }
@@ -344,11 +379,13 @@ async function startBookingForTenant(
       administrativeNotice: channel.administrativeNotice,
       welcomeMessage:
         channel.welcomeMessage ?? `Olá! Você está falando com ${tenant.name}.`,
-      prompt: "Qual serviço deseja agendar?",
+      prompt: channel.interactionMode === "text"
+        ? copy.askService({ services: copyItems(transition.context.options) })
+        : "Qual serviço deseja agendar?",
       buttonText: "Escolher serviço",
       options: transition.context.options,
       mode: channel.interactionMode,
-      hint: "Responda com o número do serviço.",
+      prose: channel.interactionMode === "text",
     }),
   };
 }
@@ -578,6 +615,7 @@ function staffSelectionTransition(input: {
   staff: Awaited<ReturnType<WhatsAppBookingGateway["listStaff"]>>;
   context: ConversationContext;
   offset?: number;
+  body?: string;
 }): ConversationTransition {
   const options = pagedOptions({
     items: input.staff,
@@ -600,14 +638,18 @@ function staffSelectionTransition(input: {
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      present(
-        input.mode,
-        "Escolha o profissional:",
-        options,
-        input.capabilities.maxReplyButtons,
-        "Ver profissionais",
-        "Responda com o número do profissional.",
-      ),
+      input.mode === "text"
+        ? prose(input.mode, input.body ?? copy.askStaff({
+          service: input.context.booking.serviceName ?? "esse serviço",
+          staff: copyItems(options),
+        }))
+        : present(
+          input.mode,
+          "Escolha o profissional:",
+          options,
+          input.capabilities.maxReplyButtons,
+          "Ver profissionais",
+        ),
     ],
   };
 }
@@ -620,7 +662,7 @@ async function staffPreferenceHandler(input: TransitionInput): Promise<Conversat
     return invalidOption(
       input,
       (await interactionModeFor(input)) === "text"
-        ? "Responda 1 para sem preferência ou 2 para escolher."
+        ? "Prefere escolher o profissional ou tanto faz?"
         : "Toque em uma das opções abaixo.",
     );
   }
@@ -674,6 +716,7 @@ async function showDates(
   input: TransitionInput,
   baseContext: ConversationContext,
   staffId: string | null,
+  body?: string,
 ): Promise<ConversationTransition> {
   if (!input.conversation.tenantId) throw new Error("conversation_tenant_missing");
   const tenant = await input.gateway.getTenantContext(input.conversation.tenantId);
@@ -700,14 +743,15 @@ async function showDates(
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      present(
-        tenant.interactionMode,
-        "Qual data funciona melhor?",
-        options,
-        input.capabilities.maxReplyButtons,
-        "Escolher data",
-        "Responda com o número da data.",
-      ),
+      tenant.interactionMode === "text"
+        ? prose(tenant.interactionMode, body ?? copy.askDate())
+        : present(
+          tenant.interactionMode,
+          "Qual data funciona melhor?",
+          options,
+          input.capabilities.maxReplyButtons,
+          "Escolher data",
+        ),
     ],
   };
 }
@@ -758,6 +802,8 @@ function slotSelectionTransition(input: {
   date: string;
   slots: readonly AvailableSlot[];
   prompt: string;
+  // Modo texto: corpo em prosa (copy). Sem ele, `offerSlots` padrão.
+  body?: string;
 }): ConversationTransition {
   const { tenant } = input;
   const maxSlots = Math.min(8, input.input.capabilities.maxListRows - 1);
@@ -778,14 +824,21 @@ function slotSelectionTransition(input: {
       lastInboundMessageId: input.input.message.providerMessageId,
     }),
     responses: [
-      present(
-        tenant.interactionMode,
-        input.prompt,
-        options,
-        input.input.capabilities.maxReplyButtons,
-        "Ver horários",
-        "Responda com o número do horário.",
-      ),
+      tenant.interactionMode === "text"
+        ? prose(tenant.interactionMode, input.body ?? copy.offerSlots({
+          dayLabel: copy.relativeDay(
+            input.date,
+            formatInTimeZone(new Date(), tenant.timezone, "yyyy-MM-dd"),
+          ),
+          slots: slotCopyItems(options, tenant.timezone),
+        }))
+        : present(
+          tenant.interactionMode,
+          input.prompt,
+          options,
+          input.input.capabilities.maxReplyButtons,
+          "Ver horários",
+        ),
     ],
   };
 }
@@ -811,13 +864,13 @@ async function slotHandler(input: TransitionInput): Promise<ConversationTransiti
       staffName,
     },
   });
+  const tenantId = input.conversation.tenantId;
+  if (!tenantId) throw new Error("conversation_tenant_missing");
+  const tenant = await input.gateway.getTenantContext(tenantId);
   if (context.booking.operation === "reschedule") {
-    const tenantId = input.conversation.tenantId;
-    if (!tenantId) throw new Error("conversation_tenant_missing");
-    const tenant = await input.gateway.getTenantContext(tenantId);
     return rescheduleConfirmationTransition(input, context, tenant);
   }
-  return customerIdentificationTransition(input, context);
+  return customerIdentificationTransition(input, context, tenant);
 }
 
 // Horário escolhido para reagendar: `context.booking` já traz o slot.
@@ -842,12 +895,18 @@ function rescheduleConfirmationTransition(
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      present(
-        tenant.interactionMode,
-        `Reagendar para ${formatDateInTimezone(startsAt, tenant.timezone)}, às ${formatTimeInTimezone(startsAt, tenant.timezone)}, com ${staffName}?`,
-        options,
-        input.capabilities.maxReplyButtons,
-      ),
+      tenant.interactionMode === "text"
+        ? prose(tenant.interactionMode, copy.rescheduleReview({
+          longDay: formatDateInTimezone(startsAt, tenant.timezone),
+          time: formatTimeInTimezone(startsAt, tenant.timezone),
+          staffName,
+        }))
+        : present(
+          tenant.interactionMode,
+          `Reagendar para ${formatDateInTimezone(startsAt, tenant.timezone)}, às ${formatTimeInTimezone(startsAt, tenant.timezone)}, com ${staffName}?`,
+          options,
+          input.capabilities.maxReplyButtons,
+        ),
     ],
   };
 }
@@ -856,6 +915,8 @@ function rescheduleConfirmationTransition(
 function customerIdentificationTransition(
   input: TransitionInput,
   context: ConversationContext,
+  tenant: BookingTenantContext,
+  body?: string,
 ): ConversationTransition {
   return {
     state: "CUSTOMER_IDENTIFICATION",
@@ -865,7 +926,13 @@ function customerIdentificationTransition(
       options: [],
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [text("Para concluir, informe seu nome completo.")],
+    responses: [
+      text(
+        tenant.interactionMode === "text"
+          ? body ?? copy.askName()
+          : "Para concluir, informe seu nome completo.",
+      ),
+    ],
   };
 }
 
@@ -918,7 +985,15 @@ function bookingReviewTransition(
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      present(tenant.interactionMode, summary, options, input.capabilities.maxReplyButtons),
+      tenant.interactionMode === "text"
+        ? prose(tenant.interactionMode, copy.review({
+          service: booking.serviceName,
+          longDay: formatDateInTimezone(booking.startsAt, tenant.timezone),
+          time: formatTimeInTimezone(booking.startsAt, tenant.timezone),
+          staffName: booking.staffName ?? null,
+          customerName: booking.customerName,
+        }))
+        : present(tenant.interactionMode, summary, options, input.capabilities.maxReplyButtons),
     ],
   };
 }
@@ -938,7 +1013,13 @@ async function confirmationHandler(input: TransitionInput): Promise<Conversation
         options: [],
         lastInboundMessageId: input.message.providerMessageId,
       }),
-      responses: [text("Fluxo cancelado. Envie “Menu” quando quiser começar novamente.")],
+      responses: [
+        text(
+          (await interactionModeFor(input)) === "text"
+            ? copy.cancelledFlow()
+            : "Fluxo cancelado. Envie “Menu” quando quiser começar novamente.",
+        ),
+      ],
     };
   }
   if (option.value === "change_slot") {
@@ -996,7 +1077,12 @@ async function confirmationHandler(input: TransitionInput): Promise<Conversation
         }),
         responses: [
           text(
-            `Agendamento reagendado para ${formatDateInTimezone(result.startsAt, tenant.timezone)}, às ${formatTimeInTimezone(result.startsAt, tenant.timezone)}.`,
+            tenant.interactionMode === "text"
+              ? copy.rescheduled({
+                longDay: formatDateInTimezone(result.startsAt, tenant.timezone),
+                time: formatTimeInTimezone(result.startsAt, tenant.timezone),
+              })
+              : `Agendamento reagendado para ${formatDateInTimezone(result.startsAt, tenant.timezone)}, às ${formatTimeInTimezone(result.startsAt, tenant.timezone)}.`,
           ),
         ],
       };
@@ -1053,7 +1139,15 @@ async function confirmationHandler(input: TransitionInput): Promise<Conversation
       }),
       responses: [
         text(
-          `Agendamento confirmado em ${tenant.name} para ${formatDateInTimezone(result.startsAt, tenant.timezone)}, às ${formatTimeInTimezone(result.startsAt, tenant.timezone)}. Profissional: ${result.staffName}.`,
+          tenant.interactionMode === "text"
+            ? copy.confirmed({
+              service: booking.serviceName ?? "Agendamento",
+              longDay: formatDateInTimezone(result.startsAt, tenant.timezone),
+              time: formatTimeInTimezone(result.startsAt, tenant.timezone),
+              staffName: result.staffName,
+              tenantName: tenant.name,
+            })
+            : `Agendamento confirmado em ${tenant.name} para ${formatDateInTimezone(result.startsAt, tenant.timezone)}, às ${formatTimeInTimezone(result.startsAt, tenant.timezone)}. Profissional: ${result.staffName}.`,
         ),
       ],
     };
@@ -1063,6 +1157,10 @@ async function confirmationHandler(input: TransitionInput): Promise<Conversation
       ...input.conversation.context,
       lastInboundMessageId: input.message.providerMessageId,
     });
+    if (tenant.interactionMode === "text") {
+      const dates = await showDates(input, context, booking.staffId ?? null, copy.askDate({ note: copy.slotTaken() }));
+      return { ...dates, state: "BOOKING_CONFLICT" };
+    }
     const dates = await showDates(input, context, booking.staffId ?? null);
     return {
       ...dates,
@@ -1258,14 +1356,15 @@ async function showRescheduleDates(input: TransitionInput): Promise<Conversation
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      present(
-        tenant.interactionMode,
-        "Escolha a nova data:",
-        options,
-        input.capabilities.maxReplyButtons,
-        "Ver datas",
-        "Responda com o número da data.",
-      ),
+      tenant.interactionMode === "text"
+        ? prose(tenant.interactionMode, copy.askRescheduleDate())
+        : present(
+          tenant.interactionMode,
+          "Escolha a nova data:",
+          options,
+          input.capabilities.maxReplyButtons,
+          "Ver datas",
+        ),
     ],
   };
 }
@@ -1332,7 +1431,7 @@ async function showMainMenu(input: TransitionInput): Promise<ConversationTransit
   if (!input.conversation.tenantId) return resolveTenantHandler(input);
   // Oferecer atendimento humano onde o canal não o tem só produz uma opção que
   // responde "não está disponível". O menu passa a espelhar a configuração.
-  const { humanHandoffEnabled } = await input.gateway.getTenantContext(
+  const { humanHandoffEnabled, interactionMode } = await input.gateway.getTenantContext(
     input.conversation.tenantId,
   );
   const options: ConversationOption[] = [
@@ -1357,7 +1456,13 @@ async function showMainMenu(input: TransitionInput): Promise<ConversationTransit
       booking: {},
       lastInboundMessageId: input.message.providerMessageId,
     }),
-    responses: [text(["Menu", ...options.map((option) => `${option.key} — ${option.label}`)].join("\n"))],
+    responses: [
+      text(
+        interactionMode === "text"
+          ? copy.mainMenu({ humanHandoff: humanHandoffEnabled })
+          : ["Menu", ...options.map((option) => `${option.key} — ${option.label}`)].join("\n"),
+      ),
+    ],
   };
 }
 
@@ -1375,12 +1480,17 @@ async function invalidOption(input: TransitionInput, message: string): Promise<C
       lastInboundMessageId: input.message.providerMessageId,
     }),
     responses: [
-      repromptResponse(
-        channel?.unknownMessageResponse ?? message,
-        input.conversation.context.options,
-        input.capabilities.maxReplyButtons,
-        channel?.interactionMode ?? "buttons",
-      ),
+      channel?.interactionMode === "text"
+        ? text(copy.didNotUnderstand({
+          configured: channel.unknownMessageResponse,
+          hint: copy.hintFor(input.conversation.currentState, input.conversation.context.options),
+        }))
+        : repromptResponse(
+          channel?.unknownMessageResponse ?? message,
+          input.conversation.context.options,
+          input.capabilities.maxReplyButtons,
+          "buttons",
+        ),
     ],
   };
 }
@@ -1625,25 +1735,25 @@ export async function transitionConversation(input: TransitionInput): Promise<{
 }
 
 const textModeSteps: TextModeSteps = {
-  serviceSelection: (input, context, services, greeting) => serviceSelectionTransition({
+  serviceSelection: (input, context, services, body) => serviceSelectionTransition({
     message: input.message,
     capabilities: input.capabilities,
     mode: "text",
     services: [...services],
     context,
-    ...(greeting === undefined ? {} : { greeting }),
+    ...(body === undefined ? {} : { body }),
   }),
-  staffPreference: (input, context) => staffPreferenceTransition(input, context, "text"),
-  staffSelection: (input, context, staff) => staffSelectionTransition({
+  staffSelection: (input, context, staff, body) => staffSelectionTransition({
     message: input.message,
     capabilities: input.capabilities,
     mode: "text",
     staff: [...staff],
     context,
+    ...(body === undefined ? {} : { body }),
   }),
   showDates,
-  slotSelection: (input, context, tenant, date, slots, prompt) =>
-    slotSelectionTransition({ input, context, tenant, date, slots, prompt }),
+  slotSelection: (input, context, tenant, date, slots, body) =>
+    slotSelectionTransition({ input, context, tenant, date, slots, prompt: body, body }),
   customerIdentification: customerIdentificationTransition,
   bookingReview: bookingReviewTransition,
   rescheduleConfirmation: rescheduleConfirmationTransition,

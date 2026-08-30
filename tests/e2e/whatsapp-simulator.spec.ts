@@ -244,34 +244,45 @@ test.describe("simulador WhatsApp com banco local", () => {
       expectedState: "SERVICE_SELECTION",
     });
     onlyText(start);
-    expect(JSON.stringify(start.responses)).toContain("1 — Manicure");
+    expect(JSON.stringify(start.responses)).toContain("A gente faz manicure e pedicure. Qual você quer?");
+    expect(JSON.stringify(start.responses)).not.toContain("1 — ");
 
-    // Serviço e profissional na mesma frase: pula a preferência e vai à data.
+    // Nome que não existe no cadastro: o bot avisa e oferece quem atende.
+    const unknown = await sendSimulatorMessage(page, {
+      message: "quero fazer manicure com o Raul",
+      expectedState: "STAFF_SELECTION",
+    });
+    onlyText(unknown);
+    expect(JSON.stringify(unknown.responses)).toContain("Só não achei ninguém chamado Raul por aqui.");
+    expect(JSON.stringify(unknown.responses)).toContain("Manicure quem faz é Bia e Carla.");
+
     const dates = await sendSimulatorMessage(page, {
-      message: "quero fazer manicure com a Bia",
+      message: "pode ser com a Bia",
       expectedState: "DATE_SELECTION",
     });
     onlyText(dates);
-    expect(JSON.stringify(dates.responses)).toContain("Anotei: Manicure · com Bia.");
+    expect(JSON.stringify(dates.responses)).toContain("Beleza, com Bia. Que dia fica bom pra você?");
 
+    // Número continua aceito em silêncio (o helper percorre as datas por número).
     const slots = await chooseAvailableDate(page, testInfo);
     onlyText(slots);
-    expect(JSON.stringify(slots.responses)).toContain("· Bia");
-    expect(JSON.stringify(slots.responses)).not.toContain("· Carla");
+    expect(JSON.stringify(slots.responses)).toContain("Você quer manicure");
+    expect(JSON.stringify(slots.responses)).toContain("com Bia, certo? Olha,");
+    expect(JSON.stringify(slots.responses)).not.toContain("Carla");
 
-    await sendSimulatorMessage(page, { message: "1", expectedState: "CUSTOMER_IDENTIFICATION" });
+    await sendSimulatorMessage(page, { message: "o primeiro", expectedState: "CUSTOMER_IDENTIFICATION" });
     const review = await sendSimulatorMessage(page, {
       message: customerName,
       expectedState: "BOOKING_CONFIRMATION",
     });
     onlyText(review);
-    expect(JSON.stringify(review.responses)).toContain("Profissional: Bia");
+    expect(JSON.stringify(review.responses)).toContain(`com Bia, no nome de ${customerName}. Posso confirmar?`);
 
-    // Rótulo por extenso vale como a opção numerada.
     const completed = await sendSimulatorMessage(page, {
-      message: "confirmar",
+      message: "sim, pode confirmar",
       expectedState: "BOOKING_COMPLETED",
     });
+    expect(JSON.stringify(completed.responses)).toContain("Fechado! Manicure confirmado");
     expect(completed.tenant?.name).toBe("Estúdio Texto");
     expect(completed.appointment?.id).toBeTruthy();
   });

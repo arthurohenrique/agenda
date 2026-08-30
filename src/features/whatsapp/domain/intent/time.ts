@@ -25,6 +25,15 @@ export function parseTime(text: string): ParsedTime | null {
     return { time: named[1].startsWith("meio") ? "12:00" : "00:00", matched: named[1] };
   }
 
+  // "14 e meia", "2 e meia da tarde".
+  const halfPast = /\b(\d{1,2})\s+e\s+meia\b(?:\s+(?:da|de|pela)\s+(manha|tarde|noite)\b)?/.exec(normalized);
+  if (halfPast?.[1]) {
+    let hour = Number(halfPast[1]);
+    if (halfPast[2] && halfPast[2] !== "manha" && hour < 12) hour += 12;
+    const time = clock(hour, 30);
+    return time ? { time, matched: halfPast[0] } : null;
+  }
+
   const withPeriod = /\b(\d{1,2})(?:[:h](\d{2}))?\s*(?:h|hs|hrs|horas?)?\s+(?:da|de|pela)\s+(manha|tarde|noite)\b/
     .exec(normalized);
   if (withPeriod?.[1] && withPeriod[3]) {
