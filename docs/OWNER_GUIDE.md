@@ -124,6 +124,12 @@ estabelecimento e pode ser mudada depois em **Configurações › WhatsApp**.
   > Bot: *Beleza! Você quer corte e barba hoje, certo? Olha, hoje a gente ainda tem
   > 14:00, 15:30 e 16:00. Qual prefere?*
 
+Quando a plataforma está com a interpretação por IA ligada, frases mais soltas
+("queria ver se rola um horário pra minha filha na sexta lá pelas duas") também são
+entendidas; a mensagem é enviada ao provedor de IA configurado apenas para extrair
+serviço, dia e horário — a resposta ao cliente continua sendo do sistema. Se o
+provedor falhar, o bot segue funcionando com as regras internas.
+
 O modo texto entende gírias e abreviações comuns ("hj", "amn", "sex", "14 e meia",
 "blz"), respostas como "sim", "pode confirmar", "não, outro horário" ou "cancela",
 e atalhos como "o primeiro" e "o último" ao escolher horário. Se o horário pedido

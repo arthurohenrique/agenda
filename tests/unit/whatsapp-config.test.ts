@@ -26,6 +26,28 @@ const completeMetaEnvironment = {
 };
 
 describe("WhatsApp configuration", () => {
+  it("desliga o LLM por padrão e o liga só com provedor e chave", () => {
+    expect(resolveWhatsAppConfig({}, "development").llm).toEqual({
+      provider: "none",
+      apiKey: null,
+      model: "llama-3.3-70b-versatile",
+      timeoutMs: 3_500,
+    });
+    expect(resolveWhatsAppConfig({
+      WHATSAPP_LLM_PROVIDER: "groq",
+      WHATSAPP_LLM_API_KEY: "k".repeat(20),
+      WHATSAPP_LLM_MODEL: "llama-3.1-8b-instant",
+      WHATSAPP_LLM_TIMEOUT_MS: "2000",
+    }, "development").llm).toEqual({
+      provider: "groq",
+      apiKey: "k".repeat(20),
+      model: "llama-3.1-8b-instant",
+      timeoutMs: 2_000,
+    });
+    expect(() => resolveWhatsAppConfig({ WHATSAPP_LLM_PROVIDER: "gemini" }, "development"))
+      .toThrow(WhatsAppConfigurationError);
+  });
+
   it("keeps the channel disabled and reports the simulator dependency", () => {
     const config = resolveWhatsAppConfig({}, "development");
 

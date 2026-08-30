@@ -8,6 +8,8 @@ const contextKeys = [
   "durationMs",
   "errorCode",
   "eventId",
+  "llmOutcome",
+  "llmProvider",
   "operation",
   "phoneNumberId",
   "providerMessageId",

@@ -143,6 +143,13 @@ Módulo em `src/features/whatsapp/` e migrations `0020`–`0024`. Auditado item 
   Pergunta fechada (`AFFIRMATION_STATES`) usa `parseAffirmation`, nunca o parser
   completo. Nome fora do cadastro vai em `booking.requestedStaffName` e é consumido
   no passo de profissional — nunca cria profissional.
+- LLM no modo texto (`infrastructure/llm/`, opt-in por `WHATSAPP_LLM_PROVIDER`):
+  o modelo **só extrai campos** (`llm-mapping.ts` re-resolve nomes pelo catálogo e
+  valida data/hora); nunca escreve copy, nunca fornece ids, nunca rebaixa o handoff
+  das regras. Toda falha (timeout, 429, JSON inválido, sem chave) cai em
+  `parseIntent` em silêncio — não adicione retry nem erro visível. Só a mensagem
+  truncada e os nomes do catálogo saem da plataforma; conteúdo nunca vai a log
+  (allowlist: `llmProvider`, `llmOutcome`). Origem do fetch é fixa.
 - Normalização pt-BR (acentos, caixa, pontuação) em `src/lib/text/normalize.ts`.
   Não reimplemente NFD inline.
 

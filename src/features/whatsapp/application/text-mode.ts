@@ -19,6 +19,9 @@ import {
   type DayPeriod,
   type ParsedIntent,
 } from "../domain/intent";
+import { fromLlmExtraction, mergeParsed } from "../domain/intent/llm-mapping";
+import type { WhatsAppIntentLlm } from "../infrastructure/llm/intent-llm";
+import { resolveWhatsAppIntentLlm } from "../infrastructure/llm/resolver";
 import * as copy from "../presentation/text-mode-copy";
 import { textResponse } from "../presentation/conversation-responses";
 import type {
@@ -175,6 +178,31 @@ const periodLabels: Record<DayPeriod, string> = {
   afternoon: "à tarde",
   evening: "à noite",
 };
+
+// Interpretação da frase: o LLM (quando configurado) lê toda mensagem e as
+// regras determinísticas rodam sempre — são o fallback silencioso para
+// timeout, 429, resposta inválida ou provedor desligado. O modelo só devolve
+// nomes e campos; ids, disponibilidade e texto de resposta continuam nossos.
+async function interpretMessage(
+  text: string,
+  context: { today: string; timezone: string; services: readonly ServiceOption[]; staff: readonly StaffOption[] },
+  llm: WhatsAppIntentLlm | null,
+): Promise<ParsedIntentResult> {
+  const parseInput = { today: context.today, services: context.services, staff: context.staff };
+  const rules = parseIntent(text, parseInput);
+  if (!llm) return rules;
+  const extraction = await llm.extract({
+    text: text.slice(0, 500),
+    today: context.today,
+    timezone: context.timezone,
+    services: context.services.map((item) => item.name),
+    staff: context.staff.map((item) => item.name),
+  });
+  if (!extraction) return rules;
+  return mergeParsed(fromLlmExtraction(extraction, parseInput), rules);
+}
+
+type ParsedIntentResult = ParsedIntent<ServiceOption, StaffOption>;
 
 async function ensureCustomer(
   input: TransitionInput,
@@ -612,7 +640,11 @@ export async function handleTextModeMessage(
     input.gateway.listServices(tenantId),
     input.gateway.listAllStaff(tenantId),
   ]);
-  const parsed = parseIntent(message.text, { today: today(tenant), services, staff });
+  const parsed = await interpretMessage(
+    message.text,
+    { today: today(tenant), timezone: tenant.timezone, services, staff },
+    resolveWhatsAppIntentLlm(),
+  );
   if (!parsed.matched) return null;
 
   if (parsed.intent === "human") {
