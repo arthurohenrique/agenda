@@ -145,6 +145,7 @@ WHATSAPP_PROVIDER=mock
 WHATSAPP_SIMULATOR_ENABLED=true
 WHATSAPP_EMBEDDED_SIGNUP_ENABLED=false
 WHATSAPP_WORKER_SECRET=<32-ou-mais-caracteres>
+WHATSAPP_LLM_PROVIDER=none
 ```
 
 `dry-run` é exclusivo do desenvolvimento local. Em produção, configure o modo

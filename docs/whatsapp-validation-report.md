@@ -183,6 +183,13 @@ política entre canais.
   interpreta a frase do cliente com regras determinísticas (serviço, profissional,
   data, hora, período, intenção — `domain/intent/`) e pergunta em texto o que falta
   (`application/text-mode.ts`). Sem LLM.
+* [x] Interpretação por LLM opcional no modo texto — `WHATSAPP_LLM_PROVIDER`
+  (`none` | `groq`), fail-closed para as regras (`infrastructure/llm/`,
+  `domain/intent/llm-mapping.ts`). O modelo só extrai campos; nomes re-resolvidos
+  pelo catálogo, datas limitadas a 60 dias, handoff das regras nunca rebaixado,
+  conteúdo da mensagem fora dos logs. Sem provedor configurado, comportamento
+  idêntico ao anterior (CI sem segredos). LGPD: mensagem e nomes do catálogo saem
+  para o provedor configurado — conferir os termos vigentes no momento do setup.
 * [x] O modo texto conversa em prosa, não em lista numerada — copy centralizada em
   `presentation/text-mode-copy.ts` (tom informal, sem emoji; alternativas inline até
   6 itens, linhas até 12, numeradas acima). Entende gírias e abreviações

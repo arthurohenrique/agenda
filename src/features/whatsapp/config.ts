@@ -30,6 +30,16 @@ const environmentSchema = z.object({
   WHATSAPP_SIMULATOR_ENABLED: optionalBoolean,
   WHATSAPP_EMBEDDED_SIGNUP_ENABLED: optionalBoolean,
   WHATSAPP_WORKER_SECRET: optionalString(32, 512),
+  WHATSAPP_LLM_PROVIDER: z.preprocess(
+    emptyAsUndefined,
+    z.enum(["none", "groq"]).optional(),
+  ),
+  WHATSAPP_LLM_API_KEY: optionalString(16, 512),
+  WHATSAPP_LLM_MODEL: optionalString(1, 128),
+  WHATSAPP_LLM_TIMEOUT_MS: z.preprocess(
+    emptyAsUndefined,
+    z.coerce.number().int().min(500).max(15_000).optional(),
+  ),
   TRUSTED_CLIENT_IP_HEADER: z.preprocess(
     emptyAsUndefined,
     z.enum(["x-real-ip", "x-vercel-forwarded-for", "cf-connecting-ip"]).optional(),
@@ -60,6 +70,14 @@ export interface WhatsAppConfig {
   simulatorEnabled: boolean;
   embeddedSignupEnabled: boolean;
   workerSecret: string | null;
+  // Interpretação por LLM no modo texto. `none` = só regras (comportamento
+  // original). A chave é exclusivamente de servidor.
+  llm: {
+    provider: "none" | "groq";
+    apiKey: string | null;
+    model: string;
+    timeoutMs: number;
+  };
   trustedClientIpHeader:
     | "x-real-ip"
     | "x-vercel-forwarded-for"
@@ -119,6 +137,12 @@ export function resolveWhatsAppConfig(
     ),
     embeddedSignupEnabled: booleanValue(input.WHATSAPP_EMBEDDED_SIGNUP_ENABLED, false),
     workerSecret: input.WHATSAPP_WORKER_SECRET ?? null,
+    llm: {
+      provider: input.WHATSAPP_LLM_PROVIDER ?? "none",
+      apiKey: input.WHATSAPP_LLM_API_KEY ?? null,
+      model: input.WHATSAPP_LLM_MODEL ?? "llama-3.3-70b-versatile",
+      timeoutMs: input.WHATSAPP_LLM_TIMEOUT_MS ?? 3_500,
+    },
     trustedClientIpHeader: input.TRUSTED_CLIENT_IP_HEADER ?? null,
     bookingTokenPepper: input.BOOKING_TOKEN_PEPPER ?? null,
     serviceRoleKey: input.SUPABASE_SERVICE_ROLE_KEY ?? null,

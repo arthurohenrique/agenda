@@ -9,6 +9,7 @@ import type {
 } from "@/features/whatsapp/application/resolve-tenant";
 
 const mocks = vi.hoisted(() => ({
+  resolveWhatsAppIntentLlm: vi.fn(),
   attachContactToTenant: vi.fn(),
   extractRoutingCode: vi.fn(),
   getWhatsAppTenantById: vi.fn(),
@@ -29,6 +30,10 @@ vi.mock("@/features/whatsapp/application/resolve-tenant", () => ({
 vi.mock("@/features/whatsapp/application/messaging-policy", () => ({
   isExplicitOptOut: mocks.isExplicitOptOut,
   recordOptOut: mocks.recordOptOut,
+}));
+
+vi.mock("@/features/whatsapp/infrastructure/llm/resolver", () => ({
+  resolveWhatsAppIntentLlm: mocks.resolveWhatsAppIntentLlm,
 }));
 
 import { transitionConversation } from "@/features/whatsapp/application/transition-conversation";
@@ -140,6 +145,7 @@ function transitionInput(input: {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.resolveWhatsAppIntentLlm.mockReturnValue(null);
   mocks.extractRoutingCode.mockReturnValue(null);
   mocks.isExplicitOptOut.mockReturnValue(false);
   mocks.recordOptOut.mockResolvedValue(undefined);
@@ -1312,6 +1318,84 @@ describe("WhatsApp conversation state machine", () => {
         );
         expect(named.transition.state).toBe("BOOKING_CONFIRMATION");
         expect(named.transition.context.booking.customerName).toBe("ajuda maria");
+      });
+
+      it("com o LLM configurado, frase fora do alcance das regras vira rascunho completo", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday10, friday14, friday16]);
+        const extract = vi.fn(async () => ({
+          intent: "book" as const,
+          service_name: "Corte feminino",
+          staff_name: "Maria",
+          date: "2026-09-04",
+          time: "14:00",
+        }));
+        mocks.resolveWhatsAppIntentLlm.mockReturnValue({ provider: "mock", extract });
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "queria ver se rola um horário pra minha filha na sexta lá pelas duas",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+
+        expect(result.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+        expect(result.transition.context.booking).toMatchObject({
+          serviceId: service.id,
+          staffId: staff[0]!.id,
+          date: "2026-09-04",
+          startsAt: friday14.startAt,
+        });
+        // Só nomes e a mensagem saem da plataforma; nunca ids nem telefone.
+        expect(extract).toHaveBeenCalledWith(expect.objectContaining({
+          services: ["Corte feminino"],
+          staff: ["Maria", "Joana"],
+          today: "2026-08-31",
+        }));
+        expect(JSON.stringify(extract.mock.calls[0])).not.toContain(ids.tenant);
+      });
+
+      it("LLM fora do ar cai nas regras em silêncio", async () => {
+        const bookingGateway = await textGateway();
+        vi.mocked(bookingGateway.getAvailableSlots).mockResolvedValue([friday14]);
+        mocks.resolveWhatsAppIntentLlm.mockReturnValue({
+          provider: "mock",
+          extract: vi.fn(async () => null),
+        });
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "corte feminino sexta às 14h com a Maria",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(result.transition.state).toBe("CUSTOMER_IDENTIFICATION");
+        expect(result.transition.context.booking.startsAt).toBe(friday14.startAt);
+      });
+
+      it("nome inventado pelo modelo não vira profissional", async () => {
+        const bookingGateway = await textGateway();
+        mocks.resolveWhatsAppIntentLlm.mockReturnValue({
+          provider: "mock",
+          extract: vi.fn(async () => ({
+            service_name: "Corte feminino",
+            staff_name: "Raul",
+            date: "hoje",
+          })),
+        });
+
+        const result = await transitionConversation(
+          transitionInput({
+            text: "qualquer coisa com o raul hoje",
+            bookingGateway,
+            conversation: conversation({ currentState: "SERVICE_SELECTION" }),
+          }),
+        );
+        expect(result.transition.state).toBe("STAFF_SELECTION");
+        expect(result.transition.context.booking.staffId).toBeUndefined();
+        expect(bodyOf(result.transition)).toContain("Só não achei ninguém chamado Raul por aqui.");
       });
 
       it("no modo botões a mesma frase é entrada inválida e o parser não roda", async () => {

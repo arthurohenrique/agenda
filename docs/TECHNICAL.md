@@ -216,6 +216,15 @@ sequenceDiagram
   (`application/text-mode.ts`). Sem LLM: a mensagem do cliente não sai da plataforma.
   Toda pergunta com opções passa por `presentOptions`, que decide o formato pelo modo.
   Opt-out e comandos globais valem nos dois modos.
+- Interpretação por LLM (opcional, `WHATSAPP_LLM_PROVIDER=groq` + chave): no modo
+  texto, toda mensagem dos estados de agendamento passa pelo modelo, que **só extrai
+  campos** (nomes, data, hora, intenção) — ids voltam pelo catálogo, datas e horas são
+  validadas, e a resposta ao cliente continua vindo da copy própria. As regras
+  determinísticas rodam sempre e são o fallback silencioso para timeout, erro, 429 ou
+  provedor desligado: o canal nunca depende do LLM. Sai da plataforma apenas a
+  mensagem (truncada em 500 caracteres) e os nomes de serviços/profissionais; nunca
+  telefone, nome do cliente ou ids. Logs registram só provedor, resultado e latência.
+  Origem fixa (`api.groq.com`), chave exclusiva de servidor.
 - Gateway reutiliza disponibilidade, criação, cancelamento e reagendamento existentes.
 - Outbox entrega pelo provedor mock ou Meta sem bloquear transação de reserva.
 - Falha técnica permanente, ou transitória a partir da penúltima tentativa, move o inbound já
