@@ -2,6 +2,7 @@ import Link from "next/link";
 import { addDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { fromZonedTime } from "date-fns-tz";
+import { todayInTimezone } from "@/lib/dates";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AgendaBoard } from "@/components/admin/agenda-board";
 import { AgendaRealtime } from "@/components/admin/agenda-realtime";
@@ -16,14 +17,14 @@ interface AgendaPageProps {
   searchParams: Promise<{ date?: string; view?: string }>;
 }
 
-function validDate(value: string | undefined) {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : format(new Date(), "yyyy-MM-dd");
+function validDate(value: string | undefined, timezone: string) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : todayInTimezone(timezone);
 }
 
 export default async function AgendaPage({ params, searchParams }: AgendaPageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const tenant = await requireTenantAccess(slug);
-  const selectedDate = validDate(query.date);
+  const selectedDate = validDate(query.date, tenant.timezone);
   const view = query.view === "week" || query.view === "month" ? query.view : "day";
   const date = parseISO(`${selectedDate}T12:00:00`);
   const localStart = view === "week" ? startOfWeek(date, { weekStartsOn: 1 }) : date;
@@ -40,7 +41,7 @@ export default async function AgendaPage({ params, searchParams }: AgendaPagePro
   ]);
   const previousDate = format(addDays(date, view === "week" ? -7 : view === "month" ? -30 : -1), "yyyy-MM-dd");
   const nextDate = format(addDays(date, view === "week" ? 7 : view === "month" ? 30 : 1), "yyyy-MM-dd");
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = todayInTimezone(tenant.timezone);
   const canOperate = ["owner", "admin", "receptionist"].includes(tenant.role);
   const periodLabel =
     view === "day"

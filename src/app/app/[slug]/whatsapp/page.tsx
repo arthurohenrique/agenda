@@ -45,6 +45,7 @@ export default async function TenantWhatsAppPage({ params }: TenantWhatsAppPageP
             canUsePlatformSimulator={Boolean(platformOwner)}
             presentation={presentation}
             slug={slug}
+            timezone={tenant.timezone}
           />
         </div>
       </div>
