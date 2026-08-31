@@ -51,6 +51,11 @@ foi reduzido deliberadamente na migration `0016_simplify_schema.sql`.
 - Use o cliente de `src/lib/supabase/server.ts` em Server Components e Actions.
 - Use o cliente browser apenas para Realtime e interações que realmente o exigem.
 - Datas persistem em UTC; formatação usa o timezone IANA do tenant.
+- O relógio do servidor é UTC (Vercel/CI); só o dev local coincide com o fuso do
+  tenant. "Hoje" nunca vem de `format(new Date(), ...)` nem de `toISOString()`:
+  use `todayInTimezone(tenant.timezone)` de `src/lib/dates.ts`. Exibição de
+  instante (`Intl.DateTimeFormat`/`formatInTimeZone`) sempre com o fuso do tenant
+  explícito — em Server Component o "fuso local" é UTC.
 - Valores monetários persistem em centavos inteiros.
 - Telefones persistem em E.164.
 - Reserva e bloqueio continuam transacionais no Postgres.

@@ -50,11 +50,13 @@ function connectionLabel(mode: NonNullable<TenantWhatsAppPresentation["phoneNumb
 export function TenantWhatsAppPanel({
   presentation,
   slug,
+  timezone,
   canUsePlatformSimulator = false,
   canManageSettings = true,
 }: {
   presentation: TenantWhatsAppPresentation;
   slug: string;
+  timezone: string;
   canUsePlatformSimulator?: boolean;
   canManageSettings?: boolean;
 }) {
@@ -229,6 +231,7 @@ export function TenantWhatsAppPanel({
             routingUsesCount={presentation.routingCode?.usesCount ?? 0}
             recentLinks={presentation.recentRoutingLinks}
             slug={slug}
+            timezone={timezone}
           />
           <section className="premium-card p-5" aria-labelledby="whatsapp-simulator-title">
             <div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl bg-zinc-100"><ShieldAlert aria-hidden="true" size={18} /></span><div><h2 className="font-bold" id="whatsapp-simulator-title">Teste controlado</h2><p className="mt-1 text-sm leading-6 text-zinc-500">O simulador usa apenas o provedor mock e não envia mensagem real.</p></div></div>
@@ -242,7 +245,7 @@ export function TenantWhatsAppPanel({
       </section>
       </> : null}
 
-      <WhatsAppHandoffQueue handoffs={presentation.handoffs} scope="tenant" slug={slug} />
+      <WhatsAppHandoffQueue handoffs={presentation.handoffs} scope="tenant" slug={slug} timezone={timezone} />
     </div>
   );
 }

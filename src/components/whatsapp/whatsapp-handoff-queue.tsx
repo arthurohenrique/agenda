@@ -14,12 +14,15 @@ function requestedByLabel(value: WhatsAppHandoffView["requestedBy"]) {
   return "Encaminhado pela equipe";
 }
 
-function dateTime(value: string) {
+// Server Component: sem `timeZone` explícito o Intl usa o fuso do processo,
+// que na Vercel é UTC — o horário do pedido apareceria 3h adiantado.
+function dateTime(value: string, timezone: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Horário indisponível";
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: timezone,
   }).format(date);
 }
 
@@ -27,10 +30,12 @@ export function WhatsAppHandoffQueue({
   handoffs,
   scope,
   slug,
+  timezone,
 }: {
   handoffs: WhatsAppHandoffView[];
   scope: "platform" | "tenant";
   slug?: string;
+  timezone: string;
 }) {
   const isPlatform = scope === "platform";
   const titleId = isPlatform ? "platform-whatsapp-handoff-queue" : "tenant-whatsapp-handoff-queue";
@@ -63,7 +68,7 @@ export function WhatsAppHandoffQueue({
                 <div>
                   <h3 className="font-bold">{handoff.contactLabel}</h3>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Conversa {handoff.conversationReference} · {dateTime(handoff.requestedAt)}
+                    Conversa {handoff.conversationReference} · {dateTime(handoff.requestedAt, timezone)}
                   </p>
                 </div>
                 <span className="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">

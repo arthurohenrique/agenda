@@ -95,7 +95,7 @@ describe("painéis WhatsApp", () => {
       warnings: ["Configuração WhatsApp ainda não está completa para este estabelecimento."],
     };
 
-    render(<TenantWhatsAppPanel presentation={presentation} slug="barbearia-demo" />);
+    render(<TenantWhatsAppPanel timezone="America/Sao_Paulo" presentation={presentation} slug="barbearia-demo" />);
 
     expect(screen.getByText("Canal desabilitado")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Link ainda indisponível" })).toBeVisible();
@@ -150,7 +150,7 @@ describe("painéis WhatsApp", () => {
     };
 
     render(
-      <TenantWhatsAppPanel
+      <TenantWhatsAppPanel timezone="America/Sao_Paulo"
         canManageSettings={false}
         presentation={presentation}
         slug="barbearia-demo"

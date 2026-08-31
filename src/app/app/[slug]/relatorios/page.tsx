@@ -1,5 +1,6 @@
-import { addDays, format } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
+import { todayInTimezone } from "@/lib/dates";
 import { BarChart3, CalendarCheck2, CircleDollarSign, UserRoundCheck } from "lucide-react";
 import { getReportSummary } from "@/features/reports/queries";
 import { requireTenantAccess } from "@/features/tenants/access";
@@ -10,7 +11,9 @@ interface ReportsPageProps { params: Promise<{ slug: string }> }
 export default async function ReportsPage({ params }: ReportsPageProps) {
   const { slug } = await params;
   const tenant = await requireTenantAccess(slug);
-  const today = new Date();
+  // "Hoje" é o dia local do estabelecimento, não o dia UTC do servidor; o
+  // meio-dia ancora a aritmética de calendário longe de qualquer virada.
+  const today = parseISO(`${todayInTimezone(tenant.timezone)}T12:00:00`);
   const start = addDays(today, -30);
   const rangeStart = fromZonedTime(`${format(start, "yyyy-MM-dd")}T00:00:00`, tenant.timezone).toISOString();
   const rangeEnd = fromZonedTime(`${format(addDays(today, 1), "yyyy-MM-dd")}T00:00:00`, tenant.timezone).toISOString();

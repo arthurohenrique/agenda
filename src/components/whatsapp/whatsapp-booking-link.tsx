@@ -22,14 +22,16 @@ export interface WhatsAppRoutingLinkView {
   message: string;
 }
 
-function shortDate(value: string | null) {
+// Expiração no fuso do estabelecimento: em UTC, um código que expira às 23h
+// local apareceria com a data do dia seguinte.
+function shortDate(value: string | null, timezone: string) {
   if (!value) return "Sem expiração";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "Data indisponível"
     : new Intl.DateTimeFormat("pt-BR", {
         dateStyle: "short",
-        timeZone: "UTC",
+        timeZone: timezone,
       }).format(date);
 }
 
@@ -41,6 +43,7 @@ export function WhatsAppBookingLink({
   recentLinks = [],
   canGenerate = false,
   slug,
+  timezone,
 }: {
   bookingLink: string | null;
   bookingMessage: string | null;
@@ -49,6 +52,7 @@ export function WhatsAppBookingLink({
   recentLinks?: WhatsAppRoutingLinkView[];
   canGenerate?: boolean;
   slug?: string;
+  timezone: string;
 }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState(false);
@@ -161,7 +165,7 @@ export function WhatsAppBookingLink({
             {recentLinks.map((link) => (
               <li className="rounded-xl bg-zinc-50 p-3" key={`${link.code}:${link.createdAt}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div><code className="text-xs font-bold tracking-wide">{link.code}</code><p className="mt-1 text-xs text-zinc-500">{link.type === "permanent_tenant_code" ? "Permanente" : link.campaign || "Temporário"} · {link.usesCount} uso{link.usesCount === 1 ? "" : "s"} · {shortDate(link.expiresAt)} · {link.status}</p>{link.source ? <p className="mt-1 text-xs text-zinc-500">Origem: {link.source}</p> : null}</div>
+                  <div><code className="text-xs font-bold tracking-wide">{link.code}</code><p className="mt-1 text-xs text-zinc-500">{link.type === "permanent_tenant_code" ? "Permanente" : link.campaign || "Temporário"} · {link.usesCount} uso{link.usesCount === 1 ? "" : "s"} · {shortDate(link.expiresAt, timezone)} · {link.status}</p>{link.source ? <p className="mt-1 text-xs text-zinc-500">Origem: {link.source}</p> : null}</div>
                   <button className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold" onClick={() => void copyLink(link.url, link.code)} type="button">{copiedKey === link.code ? <Check aria-hidden="true" size={15} /> : <Copy aria-hidden="true" size={15} />}{copiedKey === link.code ? "Copiado" : "Copiar"}</button>
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-600">{link.message}</p>

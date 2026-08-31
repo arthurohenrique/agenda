@@ -27,6 +27,10 @@ function modeLabel(mode: PlatformWhatsAppOverview["phoneNumbers"][number]["conne
   return "Número do estabelecimento";
 }
 
+// Painel global, sem tenant: os horários saem no fuso de operação da
+// plataforma. Sem `timeZone` explícito, o Server Component renderiza em UTC.
+const PLATFORM_TIMEZONE = "America/Sao_Paulo";
+
 function dateTime(value: string | null) {
   if (!value) return "Ainda não recebido";
   const date = new Date(value);
@@ -34,6 +38,7 @@ function dateTime(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: PLATFORM_TIMEZONE,
   }).format(date);
 }
 
@@ -116,7 +121,7 @@ export function WhatsAppDiagnostics({ overview }: { overview: PlatformWhatsAppOv
         </section>
       ) : null}
 
-      <WhatsAppHandoffQueue handoffs={overview.handoffs} scope="platform" />
+      <WhatsAppHandoffQueue handoffs={overview.handoffs} scope="platform" timezone={PLATFORM_TIMEZONE} />
 
       <section aria-labelledby="whatsapp-operations-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
