@@ -14,6 +14,12 @@ export function AgendaRealtime({ tenantId }: { tenantId: string }) {
     let active = true;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
+    // O access token expira em cerca de uma hora; sem renovar, o socket para de
+    // entregar em silêncio e a agenda parece só não ter movimento.
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void supabase.realtime.setAuth(session.access_token);
+    });
+
     async function subscribeToAgenda() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!active) return;
@@ -63,6 +69,7 @@ export function AgendaRealtime({ tenantId }: { tenantId: string }) {
 
     return () => {
       active = false;
+      authListener.subscription.unsubscribe();
       if (channel) void supabase.removeChannel(channel);
     };
   }, [router, tenantId]);

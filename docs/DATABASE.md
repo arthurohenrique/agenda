@@ -201,6 +201,14 @@ usar as colunas `jsonb` já existentes nas entidades principais.
   recebimento antes do processamento do webhook.
 - `0024_whatsapp_retention.sql`: adiciona policy privada versionada, `legal_hold`,
   encerramento de sessões abandonadas e redação/exclusão em lotes.
+- `0028_whatsapp_conversation_realtime.sql`: publica `whatsapp_messages` no
+  Realtime para o visualizador de conversas do painel, com lista de colunas e
+  **sem** `replica identity full`. O INSERT já viaja com a tupla nova, que é onde
+  o filtro `tenant_id=eq.<id>` é avaliado; `full` só serviria ao `old_record` de
+  UPDATE/DELETE, e o UPDATE de redação da retenção (`0024`) mandaria o `content`
+  anterior à redação a todo gestor inscrito. `whatsapp_conversations` fica fora
+  porque o `context` carrega slots da máquina de estados, e `whatsapp_contacts`
+  porque, sem `tenant_id`, nenhum filtro por estabelecimento seria possível.
 - `0025_service_role_core_reads.sql`: concede `select` ao `service_role` nas tabelas do
   núcleo lidas pelo cliente admin do servidor, inclusive as que entram por embed do
   PostgREST. Sem isso o gateway do WhatsApp e o worker de notificações falham com

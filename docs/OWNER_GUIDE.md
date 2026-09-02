@@ -106,7 +106,31 @@ cada dispositivo.
 Os relatórios mostram os últimos 30 dias: agendamentos, receitas, clientes únicos,
 serviços mais agendados, cancelamentos e faltas.
 
-## 12. WhatsApp: botões ou texto
+## 12. WhatsApp: acompanhar as conversas ao vivo
+
+Em **WhatsApp › Conversas** você acompanha, sem recarregar a página, o cliente
+escrevendo e o bot respondendo. É uma tela de leitura: nada é enviado por ali.
+
+- A lista mostra as conversas do seu estabelecimento, da mais recente para a mais
+  antiga, com a última mensagem e o selo **Aguardando resposta** quando o cliente
+  falou por último.
+- Ao abrir uma conversa, o cabeçalho diz em que etapa ela está e traz o selo da
+  **janela de 24h**. Fora dessa janela o WhatsApp só permite modelos aprovados —
+  é o motivo mais comum de o bot parecer mudo.
+- Mensagens antigas apagadas pela política de retenção aparecem como
+  "Conteúdo removido", com o horário preservado.
+- Se a atualização ao vivo cair, aparece um aviso e o botão **Atualizar** continua
+  trazendo o que chegou.
+
+Quem só tem a permissão de atendimento humano vê apenas as conversas encaminhadas
+para a equipe.
+
+**Número compartilhado:** vários estabelecimentos podem usar o mesmo número da
+plataforma, e você só enxerga as conversas do seu. Enquanto um cliente está em
+conversa com outro estabelecimento, ele não aparece na sua lista — quando essa
+conversa encerra e ele procura você, a conversa nova aparece normalmente.
+
+## 13. WhatsApp: botões ou texto
 
 O canal WhatsApp atende de duas formas. A escolha é feita ao criar o
 estabelecimento e pode ser mudada depois em **Configurações › WhatsApp**.
@@ -139,7 +163,7 @@ mesmo nome, ele pergunta qual. As alternativas aparecem na própria frase; só l
 muito longas viram itens. Em qualquer modo, "Menu", "Cancelar" e "Atendente"
 continuam funcionando.
 
-## 13. Boas práticas
+## 14. Boas práticas
 
 - Revise diariamente confirmações pendentes.
 - Use bloqueios em vez de deixar horários incorretos disponíveis.
@@ -148,7 +172,7 @@ continuam funcionando.
 - Use os dados de clientes apenas para administrar atendimentos.
 - Confirme o estabelecimento selecionado antes de alterar dados.
 
-## 14. Ajuda rápida
+## 15. Ajuda rápida
 
 | Situação | Ação recomendada |
 |---|---|

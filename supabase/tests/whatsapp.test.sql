@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(182);
+select plan(200);
 
 select ok(
   not exists (
@@ -3600,6 +3600,178 @@ select ok(
   ),
   'Onboarding sem modo informado grava botões'
 );
+
+-- Visualizador de conversas ao vivo (0028_whatsapp_conversation_realtime.sql).
+-- Só `whatsapp_messages` é replicado, e sem `replica identity full`: o
+-- `old_record` de um UPDATE levaria o `content` anterior à redação da retenção.
+select ok(
+  exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'whatsapp_messages'
+  ),
+  'Mensagens WhatsApp entram na publicação de Realtime'
+);
+select ok(
+  not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'whatsapp_conversations'
+  ),
+  'Conversas ficam fora do Realtime: context carrega slots da máquina de estados'
+);
+select ok(
+  not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'whatsapp_contacts'
+  ),
+  'Contatos ficam fora do Realtime: sem tenant_id nenhum filtro seria possível'
+);
+select is(
+  (
+    select relreplident::text from pg_class
+    where oid = 'public.whatsapp_messages'::regclass
+  ),
+  'd',
+  'Mensagens replicam por chave primária, nunca com replica identity full'
+);
+select ok(
+  has_column_privilege('authenticated', 'public.whatsapp_messages', 'content', 'SELECT'),
+  'Gestor lê o conteúdo da mensagem do próprio estabelecimento'
+);
+select ok(
+  not has_column_privilege(
+    'authenticated', 'public.whatsapp_messages', 'content_redacted_at', 'SELECT'
+  ),
+  'Marca de redação não é selecionável: a lápide vem do próprio content'
+);
+select ok(
+  not has_column_privilege(
+    'authenticated', 'public.whatsapp_messages', 'provider_payload', 'SELECT'
+  ),
+  'Envelope cru da Meta continua restrito ao service_role'
+);
+
+-- Isolamento no número compartilhado: as conversas 95..0001 (tenant 1),
+-- 95..0002 (tenant 2) e 95..0003 (sem tenant) usam o mesmo phone_number_id.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","app_metadata":{}}',
+  true
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id = '95000000-0000-4000-8000-000000000001'
+  ),
+  2,
+  'Owner lê a transcrição da conversa do próprio estabelecimento'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id = '95000000-0000-4000-8000-000000000002'
+  ),
+  0,
+  'Owner não lê a transcrição de outro tenant no mesmo número'
+);
+select is(
+  (select count(*)::integer from public.whatsapp_messages where tenant_id is null),
+  0,
+  'Owner não lê mensagens ainda sem estabelecimento resolvido'
+);
+select ok(
+  exists (
+    select 1 from public.whatsapp_contacts
+    where id = '94000000-0000-4000-8000-000000000001'
+  ),
+  'Owner identifica o contato da própria conversa'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_contacts
+    where id in (
+      '94000000-0000-4000-8000-000000000002',
+      '94000000-0000-4000-8000-000000000003'
+    )
+  ),
+  0,
+  'Owner não identifica contatos de conversas que não pode ler'
+);
+reset role;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated","app_metadata":{}}',
+  true
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id = '95000000-0000-4000-8000-000000000002'
+  ),
+  1,
+  'Owner do outro tenant lê apenas a própria transcrição no número compartilhado'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id = '95000000-0000-4000-8000-000000000001'
+  ),
+  0,
+  'Isolamento no número compartilhado vale nos dois sentidos'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_conversations
+    where tenant_id = '20000000-0000-0000-0000-000000000001'
+  ),
+  0,
+  'Owner do outro tenant não lista conversas do primeiro estabelecimento'
+);
+reset role;
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","app_metadata":{}}',
+  true
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id = '95000000-0000-4000-8000-000000000002'
+  ),
+  1,
+  'Permissão de handoff lê a transcrição da conversa em atendimento humano'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_conversations
+    where tenant_id = '20000000-0000-0000-0000-000000000002'
+      and status <> 'human_handoff'
+  ),
+  0,
+  'Permissão de handoff lista somente as conversas encaminhadas'
+);
+select is(
+  (
+    select count(*)::integer from public.whatsapp_messages
+    where conversation_id in (
+      '95000000-0000-4000-8000-000000000001',
+      '95000000-0000-4000-8000-000000000003'
+    )
+  ),
+  0,
+  'Permissão de handoff não alcança outras conversas nem as sem tenant'
+);
+reset role;
 
 select * from finish();
 rollback;

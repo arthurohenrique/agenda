@@ -37,6 +37,21 @@ rate limit persistente antes da leitura do corpo; a retenção usa TTL versionad
 WhatsApp têm pgTAP configurado, mas ainda dependem de execução em ambiente com
 Docker/Supabase local.
 
+O visualizador de conversas do painel (`0028_whatsapp_conversation_realtime.sql`)
+amplia a exposição sem criar leitor novo: quem lê é exatamente
+`app_private.can_read_whatsapp_conversation` — owner, admin e recepcionista do
+estabelecimento, ou a permissão `whatsapp_handoff` limitada a conversas em
+atendimento humano. Nenhum `grant` foi adicionado; as colunas já concedidas em
+`0020` seguem valendo, e `provider_payload` e `content_redacted_at` continuam
+restritos. Só `whatsapp_messages` entra na publicação de Realtime, por lista de
+colunas e com replica identity padrão, para que nenhum `old_record` de UPDATE
+transporte o `content` anterior à redação da retenção. O filtro do canal é
+`tenant_id=eq.<id>`, reavaliado por assinante contra a RLS, e as consultas do
+servidor repetem `.eq("tenant_id", …)` — conversas ainda sem estabelecimento
+resolvido não aparecem para tenant algum. Telefone do contato só é exibido
+mascarado. Isolamento em número compartilhado coberto por pgTAP em
+`supabase/tests/whatsapp.test.sql`.
+
 Relatórios e planos ficam nas pastas homônimas.
 
 Pendências humanas: rotacionar segredo já compartilhado, remover contas demo do
