@@ -3740,6 +3740,46 @@ select is(
 );
 reset role;
 
+-- Fixture própria: a conversa semeada 95..0002 começa em `human_handoff`, mas
+-- os testes do gateway de reserva a movem para `waiting_customer` mais acima
+-- neste arquivo. Depender daquele estado aqui seria depender de um efeito
+-- colateral de outro bloco. A conversa nova usa o MESMO número compartilhado,
+-- com contato próprio para não colidir com o índice de conversa ativa única.
+set local role service_role;
+insert into public.whatsapp_contacts (
+  id, provider, normalized_phone, whatsapp_user_id, profile_name
+) values (
+  '94900000-0000-4000-8000-000000000001',
+  'mock', '+551188887777', '551188887777', 'Contato pgTAP Handoff'
+);
+insert into public.whatsapp_conversations (
+  id, phone_number_id, contact_id, tenant_id, status, current_state,
+  service_window_expires_at, session_expires_at, last_inbound_at, context, version
+) values (
+  '95900000-0000-4000-8000-000000000001',
+  '91000000-0000-4000-8000-000000000001',
+  '94900000-0000-4000-8000-000000000001',
+  '20000000-0000-0000-0000-000000000002',
+  'human_handoff', 'HUMAN_HANDOFF',
+  statement_timestamp() + interval '24 hours',
+  statement_timestamp() + interval '45 minutes',
+  statement_timestamp(),
+  '{"handoffReason":"pgtap_viewer"}', 1
+);
+insert into public.whatsapp_messages (
+  id, conversation_id, tenant_id, provider, direction, message_type,
+  external_event_key, status, content, normalized_content
+) values (
+  '96900000-0000-4000-8000-000000000001',
+  '95900000-0000-4000-8000-000000000001',
+  '20000000-0000-0000-0000-000000000002',
+  'mock', 'inbound', 'text',
+  'pgtap-viewer-handoff-inbound', 'received',
+  '{"text":"Quero falar com um atendente"}',
+  '{"text":"quero falar com um atendente"}'
+);
+reset role;
+
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
@@ -3749,7 +3789,7 @@ select set_config(
 select ok(
   exists (
     select 1 from public.whatsapp_messages
-    where conversation_id = '95000000-0000-4000-8000-000000000002'
+    where conversation_id = '95900000-0000-4000-8000-000000000001'
   ),
   'Permissão de handoff lê a transcrição da conversa em atendimento humano'
 );
