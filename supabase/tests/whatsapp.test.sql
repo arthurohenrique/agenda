@@ -3664,26 +3664,30 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","app_metadata":{}}',
   true
 );
-select is(
-  (
-    select count(*)::integer from public.whatsapp_messages
-    where conversation_id = '95000000-0000-4000-8000-000000000001'
+-- Invariantes, não contagens: os blocos anteriores deste arquivo gravam
+-- mensagens nas conversas semeadas, então qualquer total absoluto envelhece.
+select ok(
+  exists (
+    select 1 from public.whatsapp_messages
+    where tenant_id = '20000000-0000-0000-0000-000000000001'
   ),
-  2,
-  'Owner lê a transcrição da conversa do próprio estabelecimento'
+  'Owner lê a transcrição do próprio estabelecimento'
 );
 select is(
   (
     select count(*)::integer from public.whatsapp_messages
-    where conversation_id = '95000000-0000-4000-8000-000000000002'
+    where tenant_id is distinct from '20000000-0000-0000-0000-000000000001'
   ),
   0,
-  'Owner não lê a transcrição de outro tenant no mesmo número'
+  'Toda mensagem visível ao owner pertence ao próprio estabelecimento'
 );
 select is(
-  (select count(*)::integer from public.whatsapp_messages where tenant_id is null),
+  (
+    select count(*)::integer from public.whatsapp_conversations
+    where tenant_id is distinct from '20000000-0000-0000-0000-000000000001'
+  ),
   0,
-  'Owner não lê mensagens ainda sem estabelecimento resolvido'
+  'Nenhuma conversa de outro tenant ou sem tenant chega ao owner'
 );
 select ok(
   exists (
@@ -3711,18 +3715,17 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated","app_metadata":{}}',
   true
 );
-select is(
-  (
-    select count(*)::integer from public.whatsapp_messages
-    where conversation_id = '95000000-0000-4000-8000-000000000002'
+select ok(
+  exists (
+    select 1 from public.whatsapp_messages
+    where tenant_id = '20000000-0000-0000-0000-000000000002'
   ),
-  1,
-  'Owner do outro tenant lê apenas a própria transcrição no número compartilhado'
+  'Owner do outro tenant lê a própria transcrição no número compartilhado'
 );
 select is(
   (
     select count(*)::integer from public.whatsapp_messages
-    where conversation_id = '95000000-0000-4000-8000-000000000001'
+    where tenant_id is distinct from '20000000-0000-0000-0000-000000000002'
   ),
   0,
   'Isolamento no número compartilhado vale nos dois sentidos'
@@ -3730,7 +3733,7 @@ select is(
 select is(
   (
     select count(*)::integer from public.whatsapp_conversations
-    where tenant_id = '20000000-0000-0000-0000-000000000001'
+    where tenant_id is distinct from '20000000-0000-0000-0000-000000000002'
   ),
   0,
   'Owner do outro tenant não lista conversas do primeiro estabelecimento'
@@ -3743,12 +3746,11 @@ select set_config(
   '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","app_metadata":{}}',
   true
 );
-select is(
-  (
-    select count(*)::integer from public.whatsapp_messages
+select ok(
+  exists (
+    select 1 from public.whatsapp_messages
     where conversation_id = '95000000-0000-4000-8000-000000000002'
   ),
-  1,
   'Permissão de handoff lê a transcrição da conversa em atendimento humano'
 );
 select is(
@@ -3760,16 +3762,16 @@ select is(
   0,
   'Permissão de handoff lista somente as conversas encaminhadas'
 );
+-- O usuário é owner dos tenants 3 e 4, então o invariante aqui é sobre o que
+-- não pode aparecer: o primeiro estabelecimento e as linhas ainda sem tenant.
 select is(
   (
     select count(*)::integer from public.whatsapp_messages
-    where conversation_id in (
-      '95000000-0000-4000-8000-000000000001',
-      '95000000-0000-4000-8000-000000000003'
-    )
+    where tenant_id = '20000000-0000-0000-0000-000000000001'
+       or tenant_id is null
   ),
   0,
-  'Permissão de handoff não alcança outras conversas nem as sem tenant'
+  'Permissão de handoff não alcança outro estabelecimento nem linhas sem tenant'
 );
 reset role;
 
