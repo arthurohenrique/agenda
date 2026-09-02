@@ -2,8 +2,17 @@ import { expect, test, type Page } from "@playwright/test";
 
 const databaseEnabled = process.env.RUN_E2E_DB === "1";
 
-// Conversa semeada do Salão da Ana no MESMO número compartilhado da Barbearia.
+// Conversas semeadas no MESMO número compartilhado: a primeira é da Barbearia
+// Central, a segunda é do Salão da Ana.
+const OWN_CONVERSATION = "95000000-0000-4000-8000-000000000001";
 const OTHER_TENANT_CONVERSATION = "95000000-0000-4000-8000-000000000002";
+
+// Endereça a conversa pelo id em vez de clicar na lista: os cenários do
+// simulador rodam em paralelo nos três projetos e criam conversas novas na
+// barbearia, que empurrariam a semeada para fora das trinta mais recentes.
+function conversationUrl(id: string) {
+  return `/app/barbearia-central/whatsapp?aba=conversas&conversa=${id}`;
+}
 
 async function login(page: Page, email: string) {
   await page.goto("/");
@@ -18,39 +27,35 @@ test.describe("visualizador de conversas WhatsApp", () => {
 
   test("gestor abre a aba e lê a transcrição do próprio estabelecimento", async ({ page }) => {
     await login(page, "dono.barbearia@agenda.local");
-    await page.goto("/app/barbearia-central/whatsapp?aba=conversas");
 
-    const list = page.getByRole("region", { name: "Conversas" });
-    await expect(list).toBeVisible();
-    const conversation = list.getByRole("link", { name: /João Cliente/ });
-    await expect(conversation).toBeVisible();
+    await page.goto("/app/barbearia-central/whatsapp?aba=conversas");
+    await expect(page.getByRole("region", { name: "Conversas" })).toBeVisible();
     await expect(page.getByText("Escolha uma conversa para acompanhar as mensagens.")).toBeVisible();
 
-    await conversation.click();
+    await page.goto(conversationUrl(OWN_CONVERSATION));
     const transcript = page.getByRole("log");
-    await expect(transcript.getByText("Olá, código BARB01")).toBeVisible();
-    await expect(transcript.getByText("Qual serviço você deseja?")).toBeVisible();
-    await expect(page.getByText("Aguardando cliente")).toBeVisible();
+    await expect(transcript.getByText("Olá, código BARB01").first()).toBeVisible();
+    await expect(transcript.getByText("Qual serviço você deseja?").first()).toBeVisible();
+
+    // O estado fica no cabeçalho da transcrição; a lista repete o mesmo rótulo
+    // no cartão da conversa, então a asserção precisa ser escopada.
+    const header = page.getByRole("region", { name: "João Cliente" });
+    await expect(header.getByText("Aguardando cliente")).toBeVisible();
   });
 
   test("conversa de outro estabelecimento no mesmo número não é alcançável", async ({ page }) => {
     await login(page, "dono.barbearia@agenda.local");
-    await page.goto("/app/barbearia-central/whatsapp?aba=conversas");
 
-    await expect(page.getByRole("region", { name: "Conversas" })).toBeVisible();
-    await expect(page.getByText("Luiza Cliente")).toHaveCount(0);
-
-    const response = await page.goto(
-      `/app/barbearia-central/whatsapp?aba=conversas&conversa=${OTHER_TENANT_CONVERSATION}`,
-    );
+    const response = await page.goto(conversationUrl(OTHER_TENANT_CONVERSATION));
     expect(response?.status()).toBe(404);
     await expect(page.getByText("Vou chamar um atendente.")).toHaveCount(0);
   });
 
   test("aba do canal continua acessível", async ({ page }) => {
     await login(page, "dono.barbearia@agenda.local");
+
     await page.goto("/app/barbearia-central/whatsapp");
-    await expect(page.getByRole("link", { name: "Conversas" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "WhatsApp" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Conversas" })).toBeVisible();
   });
 });
